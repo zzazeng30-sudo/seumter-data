@@ -1,0 +1,59 @@
+/**
+ * [Revision Info]
+ * Rev: 22.0 (Full Code - Fix White Space)
+ * Author: AI Assistant
+ */
+
+.pageContainerMap {
+  display: flex;
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh;
+  background: #fff;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ★ 사이드바 여백 제거 및 너비 고정 */
+.sidebar {
+  position: relative;
+  width: 320px;
+  height: 100%;
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  transition: transform 0.3s ease-in-out;
+  z-index: 40;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 0 !important; /* 내부 여백 완전 제거 */
+  margin: 0 !important;
+}
+
+.sidebarOpen {
+  transform: translateX(0);
+}
+
+.sidebarClosed {
+  transform: translateX(-320px);
+}
+
+/* 지도 영역 - 남은 공간을 0의 오차 없이 꽉 채움 */
+.mapSection {
+  flex-grow: 1;
+  position: relative;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  background-color: #f3f4f6;
+  margin: 0;
+  padding: 0;
+}
+
+.contentArea {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
