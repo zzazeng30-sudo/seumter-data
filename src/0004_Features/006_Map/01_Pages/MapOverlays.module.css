@@ -272,7 +272,7 @@
     position: absolute !important;
     /* 필터 컨테이너 바로 밑으로 30px 위치하도록 설정 */
     top: 0 !important; 
-    margin-top: 30px !important; 
+    margin-top: 70px !important; 
     right: 12px !important;
     left: auto !important;
     transform: none !important; /* 중앙 정렬 해제 */
