@@ -1,24 +1,48 @@
 /* src/0004_Features/006_Map/01_Pages/MapOverlays.module.css */
 
 /* =============================================================================
-   [SECTION 1] 지도 상단 필터 및 컨트롤 UI
+   [SECTION 1] 공통 레이아웃 및 기본 스타일
    ============================================================================= */
 
-/* 상단 필터 바 (중앙 정렬) */
+/* 1. 상단 필터 바 (기본 설정) */
 .topFilterBar {
   position: absolute;
-  top: 15px;
-  left: 50%;
-  transform: translateX(-50%);
   z-index: 20;
   display: flex;
   align-items: center;
   gap: 10px;
-  white-space: nowrap;
   width: fit-content;
+  transition: all 0.3s ease;
 }
 
-/* 필터 컨테이너 */
+/* 2. 지도 컨트롤 버튼 컨테이너 (기본: 우측 상단) */
+.controlsContainer {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+/* 3. 필터 표시 제어 (기본 상태) */
+.desktopFilterWrapper {
+  display: block; /* 데스크탑: 보임 */
+}
+
+.mobileFilterContainer {
+  display: none; /* 모바일: 숨김 */
+}
+
+
+/* =============================================================================
+   [SECTION 2] 기존 스타일 (필터 박스, 핀, 모달 등)
+   ============================================================================= */
+
+/* 데스크탑용 필터 박스 디자인 */
 .mapFilterContainer {
   display: flex;
   gap: 0.5rem;
@@ -29,15 +53,12 @@
   padding: 0.5rem;
 }
 
-/* 필터 선택 박스 디자인 */
-.filterSelect, .mapFilterSelect {
+.filterSelect,
+.mapFilterSelect {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  
-  /* 글자 주변 여백 */
-  padding: 0.5rem 2rem 0.5rem 0.75rem; 
-  
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
   color: #374151;
@@ -46,101 +67,43 @@
   border-radius: 0.375rem;
   cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
-  
-  /* 화살표 아이콘 */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.5rem center;
   background-size: 1.25em 1.25em;
-  
   min-width: 100px;
   height: 2.5rem;
 }
 
-.filterSelect:focus, .mapFilterSelect:focus {
-  outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px #dbeafe;
+.filterSelect:focus,
+.mapFilterSelect:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px #dbeafe;
 }
-.filterSelect:hover, .mapFilterSelect:hover {
+
+.filterSelect:hover,
+.mapFilterSelect:hover {
   border-color: #9ca3af;
 }
 
-/* 지도 우측 상단 컨트롤 버튼 그룹 (스카이뷰, 지적편집도 등) */
-.mapControlContainer {
-  position: absolute; top: 1rem; right: 1rem; z-index: 30;
-  display: flex; background-color: #ffffff; border-radius: 0.375rem;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #d1d5db;
-}
-.mapControlButton {
-  padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; color: #374151;
-  background-color: #ffffff; border: none; cursor: pointer; transition: background-color 0.2s;
-}
-.mapControlButton:not(:last-child) { border-right: 1px solid #d1d5db; }
-.mapControlButton:first-child { border-top-left-radius: 0.375rem; border-bottom-left-radius: 0.375rem; }
-.mapControlButton:last-child { border-top-right-radius: 0.375rem; border-bottom-right-radius: 0.375rem; }
-.mapControlButton:hover { background-color: #f3f4f6; }
-.mapControlButton.active { background-color: #2563eb; color: #ffffff; }
-
-/* =============================================================================
-   [SECTION 2] 로드뷰 및 모달
-   ============================================================================= */
-
-/* 로드뷰 컨테이너 */
-.roadview {
-  position: absolute; top: 5rem; right: 1rem; width: 45%; height: 60%; z-index: 30;
-  border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.3); border-radius: 0.5rem;
-  transition: opacity 0.3s, transform 0.3s; opacity: 0; transform: scale(0.9) translateX(50px); pointer-events: none;
-}
-.roadviewVisible { opacity: 1; transform: scale(1) translateX(0); pointer-events: auto; }
-
-/* 로드뷰 닫기 버튼 */
-.roadviewCloseButton {
-  position: absolute; top: 5.3rem; right: 1.3rem; z-index: 31;
-  background-color: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 2.25rem; height: 2.25rem;
-  font-size: 1.25rem; font-weight: 700; cursor: pointer; display: flex; justify-content: center; align-items: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4); transition: background-color 0.2s, transform 0.1s;
-}
-.roadviewCloseButton:hover { background-color: rgba(0,0,0,0.8); transform: scale(1.05); }
-
-/* 컨텍스트 메뉴 (우클릭) */
-.contextMenu {
-  position: absolute; background-color: white; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000;
-  min-width: 180px; display: flex; flex-direction: column; padding: 0.5rem; border: 1px solid #e5e7eb;
-}
-.contextMenu button {
-  padding: 0.5rem 0.75rem; font-size: 0.875rem; color: #374151; background: none; border: none; text-align: left; cursor: pointer;
-  border-radius: 0.25rem; display: flex; align-items: center; gap: 0.5rem; width: 100%;
-}
-.contextMenu button:hover { background-color: #f3f4f6; }
-
-/* AI 분석 모달 */
-.imModalOverlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 50; }
-.imModal { background: white; padding: 2rem; border-radius: 0.75rem; width: 90%; max-width: 48rem; max-height: 90%; display: flex; flex-direction: column; gap: 1.5rem; }
-.imModalTitle { font-size: 1.5rem; font-weight: 700; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem; }
-.imContentScroll { flex-grow: 1; overflow-y: auto; white-space: pre-wrap; }
-
-/* 이미지 뷰어 모달 */
-.imageViewerModal { background: #ffffff; padding: 1rem; border-radius: 0.5rem; max-width: 90vw; max-height: 90vh; display: flex; justify-content: center; align-items: center; position: relative; }
-.imageViewerModal img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.imageViewerCloseButton { position: absolute; top: -1rem; right: -1rem; width: 2.5rem; height: 2.5rem; border-radius: 50%; background-color: #dc2626; color: white; border: 2px solid white; font-weight: bold; font-size: 1.25rem; cursor: pointer; z-index: 100; display: flex; justify-content: center; align-items: center; }
-
-/* =============================================================================
-   [SECTION 3] 핀(Pin) 및 오버레이 스타일 (핵심 수정 영역)
-   ============================================================================= */
-
-/* 1. 우클릭 시 뜨는 빨간 화살표 핀 (임시 핀) */
+/* -----------------------------------------------------------------------------
+   핀(Pin) 스타일
+   ----------------------------------------------------------------------------- */
+/* 우클릭 빨간 핀 */
 .tempPin {
   width: 32px;
   height: 48px;
   pointer-events: none;
-  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
 }
 
-/* 2. 커스텀 핀 (카드형) 공통 스타일 */
+/* 커스텀 핀 공통 */
 .customPin {
   position: relative;
   background-color: white;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -154,11 +117,12 @@
   border: 1px solid #e5e7eb;
   min-width: 80px;
 }
+
 .customPin:hover {
   transform: scale(1.1);
-  z-index: 100 !important; /* 호버 시 맨 위로 */
+  z-index: 100 !important;
 }
-/* 말풍선 꼬리 */
+
 .customPin::after {
   content: '';
   position: absolute;
@@ -170,49 +134,55 @@
   border-top: 6px solid white;
 }
 
-/* 3. [개별 매물] 주황색 테마 */
+/* 개별 매물 핀 */
 .customPinSingle {
-  border: 2px solid #f59e0b; /* Amber-500 */
+  border: 2px solid #f59e0b;
 }
+
 .customPinSingle::after {
   border-top-color: #f59e0b;
 }
+
 .pinType {
   font-size: 0.7rem;
   color: #f59e0b;
   margin-bottom: 2px;
 }
+
 .pinPrice {
   color: #1f2937;
   font-size: 0.85rem;
 }
 
-/* 4. [스택 매물] 초록색 테마 (유저가 직접 묶은 매물) */
+/* 스택 매물 핀 */
 .customPinStack {
-  border: 2px solid #10b981; /* Emerald-500 */
-  background-color: #ecfdf5; /* Emerald-50 */
+  border: 2px solid #10b981;
+  background-color: #ecfdf5;
 }
+
 .customPinStack::after {
   border-top-color: #10b981;
 }
+
 .stackTitle {
   font-size: 0.75rem;
   color: #047857;
   margin-bottom: 2px;
 }
+
 .stackCount {
   font-size: 0.9rem;
   color: #1f2937;
 }
 
-/* 5. [자동 클러스터] 파란색 원형 (★ 신규 추가: 줌 아웃 시 자동 묶음) */
+/* 클러스터 핀 */
 .clusterPin {
   width: 50px;
   height: 50px;
-  background: rgba(37, 99, 235, 0.95); /* Blue-600 */
+  background: rgba(37, 99, 235, 0.95);
   border-radius: 50%;
   border: 3px solid white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -223,24 +193,24 @@
   animation: bounceIn 0.3s ease-out;
   z-index: 50;
 }
+
 .clusterPin:hover {
-  background: #1d4ed8; /* Blue-700 */
+  background: #1d4ed8;
   transform: scale(1.1);
   z-index: 101 !important;
 }
-/* 클러스터 내부 숫자는 클릭 이벤트 방지 (부모에게 전달) */
+
 .clusterPin span {
   pointer-events: none;
 }
 
-/* 클러스터 등장 애니메이션 */
 @keyframes bounceIn {
   0% { transform: scale(0); opacity: 0; }
   60% { transform: scale(1.1); }
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* 6. [활성화 핀] 빨간색 강조 및 파동 애니메이션 (★ 수정됨) */
+/* 활성화 핀 (Pulse 효과) */
 @keyframes pulseRed {
   0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
   70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
@@ -248,29 +218,213 @@
 }
 
 .activePin {
-  /* 빨간색 테두리와 배경 */
-  border: 2px solid #dc2626 !important; /* Red-600 */
+  border: 2px solid #dc2626 !important;
   background-color: white !important;
   color: #1f2937 !important;
-  
-  /* 크기 확대 및 최상단 배치 */
-  transform: scale(1.2) !important; 
+  transform: scale(1.2) !important;
   z-index: 999 !important;
-  
-  /* 파동 애니메이션 */
   animation: pulseRed 1.5s infinite;
 }
 
-/* 활성화된 핀의 꼬리 색상 변경 */
 .activePin::after {
   border-top-color: #dc2626 !important;
 }
 
-/* 활성화 시 내부 텍스트 색상 강제 지정 */
-.activePin .pinType, 
-.activePin .pinPrice, 
-.activePin .stackTitle, 
+.activePin .pinType,
+.activePin .pinPrice,
+.activePin .stackTitle,
 .activePin .stackCount {
   color: #1f2937 !important;
   font-weight: 800 !important;
 }
+
+/* -----------------------------------------------------------------------------
+   모달 및 팝업
+   ----------------------------------------------------------------------------- */
+.roadview {
+  position: absolute;
+  top: 5rem;
+  right: 1rem;
+  width: 45%;
+  height: 60%;
+  z-index: 30;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+  opacity: 0;
+  transform: scale(0.9) translateX(50px);
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.roadviewVisible {
+  opacity: 1;
+  transform: scale(1) translateX(0);
+  pointer-events: auto;
+}
+
+.roadviewCloseButton {
+  position: absolute;
+  top: 5.3rem;
+  right: 1.3rem;
+  z-index: 31;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.contextMenu {
+  position: absolute;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.contextMenu button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #374151;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.contextMenu button:hover {
+  background-color: #f3f4f6;
+}
+
+
+/* =============================================================================
+   [SECTION 3] 데스크탑 전용 스타일 (769px 이상)
+   ============================================================================= */
+@media (min-width: 769px) {
+  /* 필터 바 중앙 정렬 */
+  .topFilterBar {
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+
+/* =============================================================================
+   [SECTION 4] 모바일 전용 스타일 (768px 이하)
+   ============================================================================= */
+@media (max-width: 768px) {
+  
+  /* 1. 지도 컨트롤(지도/스카이뷰) 버튼: 화면 정중앙 배치 */
+  .controlsContainer {
+right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    
+    /* 모바일에서는 조금 더 작게 조정 */
+    padding: 3px;
+    top: 15px;
+    width: max-content;
+  }
+  
+.controlBtn {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  /* 2. 필터 바: 좌측 정렬 및 컨트롤 하단 배치 */
+  .topFilterBar {
+    top: 60px !important;        /* 컨트롤 버튼 아래 위치 */
+    left: 0 !important;          /* 왼쪽 끝 */
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;  /* 데스크탑의 중앙 정렬 해제 */
+    
+    display: flex;
+    justify-content: flex-start; /* 왼쪽부터 정렬 */
+    
+    padding: 0 16px 10px 16px !important; /* 좌우 여백 */
+    overflow-x: auto;            /* 가로 스크롤 활성화 */
+    white-space: nowrap;
+    
+    /* 스크롤바 숨기기 */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    pointer-events: auto;
+  }
+  
+  .topFilterBar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 3. 모바일 필터 컨테이너 표시 & 데스크탑 필터 숨기기 */
+  .desktopFilterWrapper {
+    display: none !important;
+  }
+  
+  .mobileFilterContainer {
+    display: flex;
+    gap: 8px; /* 칩 간격 */
+    align-items: center;
+    width: max-content; /* 내용물 크기만큼 너비 확보 */
+  }
+
+  /* 4. 모바일 전용 칩(Chip) 스타일 */
+  .mobileChipSelect {
+    appearance: none;
+    -webkit-appearance: none;
+    
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 100px; /* 완전 둥근 모양 */
+    
+    height: 34px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b5563;
+    
+    text-align: center;
+    text-align-last: center;
+    line-height: 1.2;
+    
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .mobileChipSelect:active {
+    transform: scale(0.96);
+    background-color: #f3f4f6;
+  }
+
+  /* 선택된 칩 강조 */
+  .mobileChipSelect[data-active="true"] {
+    background-color: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.3);
+    font-weight: 700;
+  }
+}
+

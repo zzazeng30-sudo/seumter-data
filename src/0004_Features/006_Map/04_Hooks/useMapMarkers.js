@@ -1,15 +1,9 @@
 /**
  * [Revision Info]
- * Rev: 86.0 (Restore InfoBox & Cluster Hover)
- * Date: 2026-01-09
- * Author: AI Assistant (PropTech Expert)
- * [Improvements]
- * 1. 클러스터(지역 묶음) 호버 시 사각형 메모창(InfoBox)이 뜨지 않던 문제 해결.
- * 2. 클러스터 및 일반 마커 모두 호버 시 정보창 호출 로직 복구.
- * 3. 양방향 호버 동기화 및 점선 테두리 시각 효과 유지.
- * [Logic Change Log]
- * - Before: CLUSTER 타입 노드에서 showInfoBox 호출이 누락되어 메모창이 보이지 않음.
- * - After:  모든 마커 타입에서 호버 시 정보창을 띄우고, 대표 매물 정보를 출력하도록 수정.
+ * Rev: 88.0 (Mobile Touch Fix)
+ * - 핀/클러스터 터치 시 지도 드래그 이벤트(dragstart)가 발생하지 않도록 
+ * touchstart에 e.stopPropagation() 추가
+ * - 클릭 시 메모가 안 뜨는 현상 해결
  */
 import { useRef, useEffect } from 'react';
 import overlayStyles from '../01_Pages/MapOverlays.module.css';
@@ -32,6 +26,7 @@ export default function useMapMarkers({
     if (!isMapReady || !mapInstanceRef.current || !window.kakao) return;
     const map = mapInstanceRef.current;
 
+    // 1. 화면에서 사라진 마커 제거
     const currentIds = new Set(displayNodes.map(n => String(n.id)));
     markersMapRef.current.forEach((overlay, id) => {
       if (!currentIds.has(String(id))) {
@@ -40,6 +35,7 @@ export default function useMapMarkers({
       }
     });
 
+    // 2. 호버 정보창(InfoBox) 오버레이 생성
     if (!hoverOverlayRef.current) {
       const container = document.createElement('div');
       container.style.display = 'none'; 
@@ -50,12 +46,20 @@ export default function useMapMarkers({
       hoverOverlayRef.current.setMap(map);
     }
 
+    // 호버 해제 시 정보창 닫기
+    if (!hoveredPinId) {
+       hideInfoBox();
+    }
+
+    // 3. 마커 렌더링 및 업데이트
     displayNodes.forEach(node => {
       const position = new window.kakao.maps.LatLng(node.lat, node.lng);
       let overlay = markersMapRef.current.get(node.id);
 
       if (!overlay) {
         const content = document.createElement('div');
+        // clickable: true로 설정하여 지도 클릭 이벤트를 막으려 시도하지만,
+        // 모바일 터치 드래그는 별도 처리가 필요함
         overlay = new window.kakao.maps.CustomOverlay({ 
           position, content, yAnchor: 1, zIndex: 100, clickable: true 
         });
@@ -64,6 +68,12 @@ export default function useMapMarkers({
       }
 
       const content = overlay.getContent();
+      
+      // ★ [핵심] 핀을 터치할 때 지도가 드래그(dragstart -> resetSelection)되는 것을 방지
+      content.ontouchstart = (e) => {
+        e.stopPropagation(); 
+      };
+
       const items = node.items || (node.data ? [node.data] : []);
       const itemIds = items.map(i => String(i.id));
       
@@ -90,15 +100,18 @@ export default function useMapMarkers({
         
         content.onmouseenter = () => {
           setHoveredPinId(itemIds);
-          // ★ 클러스터 호버 시에도 첫 번째 아이템 정보를 정보창에 표시
           if (items.length > 0) showInfoBox(items[0], position, '#3b82f6');
         };
         content.onmouseleave = () => {
           setHoveredPinId(null);
           hideInfoBox();
         };
-        content.onclick = (e) => { e.stopPropagation(); map.setBounds(new window.kakao.maps.LatLngBounds().extend(position), 80); };
+        content.onclick = (e) => { 
+          e.stopPropagation(); 
+          map.setBounds(new window.kakao.maps.LatLngBounds().extend(position), 80); 
+        };
       } else {
+        // SINGLE or STACK
         const mainPin = node.type === 'SINGLE' ? node.data : node.items[0];
         const isSelected = selectedPin?.id === mainPin.id || activeOverlayKey === node.id;
         const statusColor = getStatusColor(mainPin.status);
@@ -135,15 +148,20 @@ export default function useMapMarkers({
           hideInfoBox();
         };
         content.onclick = (e) => { 
-          e.stopPropagation(); setSelectedPin(mainPin); setActiveOverlayKey(node.id); map.panTo(position); 
+          e.stopPropagation(); 
+          setSelectedPin(mainPin); 
+          setActiveOverlayKey(node.id); 
+          map.panTo(position); 
         };
         content.oncontextmenu = (e) => { 
-          e.preventDefault(); e.stopPropagation(); handlePinContextMenu(e, mainPin, isStack, node.id); 
+          e.preventDefault(); e.stopPropagation(); 
+          handlePinContextMenu(e, mainPin, isStack, node.id); 
         };
       }
     });
   }, [displayNodes, isMapReady, selectedPin, hoveredPinId, activeOverlayKey]);
 
+  // 정보창 표시 함수
   const showInfoBox = (pin, position, color) => {
     if (!hoverOverlayRef.current) return;
     const fmt = (n) => {

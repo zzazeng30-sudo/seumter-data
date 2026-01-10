@@ -1,9 +1,4 @@
-/**
- * [Revision: 48.0]
- * - 월세 상세 정보 포맷: 월세 | 보증금 | 권리금
- * - selectedPin 감지하여 자동 노출
- */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMap } from '../../02_Contexts/MapContext';
 import PinForm from './PinForm';
 
@@ -12,9 +7,25 @@ const RightPanel = () => {
     selectedPin, isEditMode, isCreating, resetSelection 
   } = useMap();
 
-  // 표시 조건: 핀이 선택되었거나 등록/수정 모드일 때
-  const isVisible = !!selectedPin || isEditMode || isCreating;
+  // 1. 현재 화면 너비 상태 관리
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 2. 모바일 여부 판정 (768px 이하)
+  const isMobile = windowWidth <= 768;
+
+  // 3. [핵심] 모바일이면 어떤 조건에서도 패널을 그리지 않고 즉시 종료
+  if (isMobile) {
+    return null;
+  }
+
+  // 4. PC 환경에서의 표시 조건
+  const isVisible = !!selectedPin || isEditMode || isCreating;
   if (!isVisible) return null;
 
   const panelStyle = {
@@ -36,7 +47,7 @@ const RightPanel = () => {
   };
 
   const renderDetailRow = (label, value) => (
-    <div style={{display:'flex', marginBottom:'10px', borderBottom:'1px solid #f9fafb', paddingBottom:'6px'}}>
+    <div key={label} style={{display:'flex', marginBottom:'10px', borderBottom:'1px solid #f9fafb', paddingBottom:'6px'}}>
         <span style={{width:'100px', color:'#6b7280', fontSize:'0.9rem', fontWeight:'500'}}>{label}</span>
         <span style={{flex:1, color:'#111827', fontSize:'0.95rem'}}>{value || '-'}</span>
     </div>
@@ -49,11 +60,9 @@ const RightPanel = () => {
         <button onClick={resetSelection} style={{ cursor: 'pointer', fontSize: '1.5rem', border: 'none', background: 'none', color:'#666' }}>&times;</button>
       </div>
       
-      {/* 1. 등록 또는 수정 모드 시 폼 표시 */}
       {(isCreating || isEditMode) ? (
         <PinForm mode={isEditMode ? 'edit' : 'create'} />
       ) : (
-        /* 2. 상세 조회 모드 */
         selectedPin && selectedPin.id && (
             <div style={{padding:'0 24px 40px'}}>
                <div style={{marginBottom:'20px'}}>
@@ -66,16 +75,10 @@ const RightPanel = () => {
                  <p style={{color:'#6b7280', fontSize:'0.9rem'}}>{selectedPin.address} {selectedPin.detailed_address}</p>
                </div>
 
-               {/* 가격 강조 섹션 */}
                <div style={{padding:'20px', backgroundColor:'#f0fdf4', borderRadius:'12px', marginBottom:'24px', border:'1px solid #dcfce7'}}>
                   <h3 style={{fontSize:'1.1rem', fontWeight:'bold', color:'#047857', margin:0}}>
                     {getPriceString(selectedPin)}
                   </h3>
-                  {Number(selectedPin.maintenance_fee) > 0 && (
-                      <p style={{margin:'5px 0 0', color:'#6b7280', fontSize:'0.9rem'}}>
-                          관리비 {Number(selectedPin.maintenance_fee).toLocaleString()}만원
-                      </p>
-                  )}
                </div>
 
                <h3 style={{fontSize:'1rem', fontWeight:'bold', borderBottom:'2px solid #f3f4f6', paddingBottom:'8px', marginBottom:'16px'}}>매물 정보</h3>
@@ -83,7 +86,6 @@ const RightPanel = () => {
                {renderDetailRow("거래 유형", selectedPin.is_sale ? '매매' : (selectedPin.is_jeonse ? '전세' : '월세'))}
                {renderDetailRow("면적", selectedPin.area ? `${selectedPin.area}평` : '')}
                {renderDetailRow("층수", selectedPin.floor ? `${selectedPin.floor}층` : '')}
-               {renderDetailRow("등록일", selectedPin.created_at ? new Date(selectedPin.created_at).toLocaleDateString() : '')}
 
                <h3 style={{fontSize:'1rem', fontWeight:'bold', borderBottom:'2px solid #f3f4f6', paddingBottom:'8px', marginBottom:'16px', marginTop:'30px'}}>상세 설명</h3>
                <div style={{whiteSpace:'pre-wrap', lineHeight:'1.6', color:'#374151', minHeight:'100px', backgroundColor:'#fff', border:'1px solid #e5e7eb', padding:'12px', borderRadius:'8px', fontSize:'0.95rem'}}>

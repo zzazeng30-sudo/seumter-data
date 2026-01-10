@@ -1,11 +1,9 @@
 /**
- * [Revision: 52.0]
- * - RoadviewClient를 활용한 로드뷰 좌표 검색 로직 강화
- * - 클릭 이벤트 발생 시 isRoadviewMode 상태를 실시간 참조하도록 수정
+ * [Revision: 53.4]
+ * - 모바일 드래그 시 resetSelection 호출 (호버 상태 및 시트 닫기 트리거)
  */
 import React, { useEffect, useRef } from 'react';
 import { useMap } from '../../02_Contexts/MapContext';
-import styles from '../../01_Pages/MapUI.module.css';
 
 const KAKAO_APP_KEY = "c493060c5720050dfb0b923762ae3423";
 const WALKER_SVG = `data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb' stroke='white' stroke-width='4'/%3E%3Cpath d='M50 15 L80 75 L50 60 L20 75 Z' fill='white'/%3E%3C/svg%3E`;
@@ -23,7 +21,6 @@ export default function KakaoMap() {
   const walkerRef = useRef(null); 
   const rightClickMarkerRef = useRef(null); 
 
-  // ★ 클로저 문제 해결을 위해 최신 상태를 담는 Ref 생성
   const handlersRef = useRef({ isRoadviewMode, setRoadviewPosition, resetSelection });
 
   useEffect(() => {
@@ -42,7 +39,6 @@ export default function KakaoMap() {
         });
         mapInstanceRef.current = map;
         
-        // ★ 로드뷰 클라이언트 생성
         rvClientRef.current = new window.kakao.maps.RoadviewClient();
         
         const handleClick = (mouseEvent) => {
@@ -50,7 +46,6 @@ export default function KakaoMap() {
           
           if (isRoadviewMode) {
             const position = mouseEvent.latLng;
-            // 50m 이내 가장 가까운 로드뷰 파노라마 ID 조회
             rvClientRef.current.getNearestPanoId(position, 50, (panoId) => {
               if (panoId) {
                 setRoadviewPosition({ 
@@ -63,6 +58,7 @@ export default function KakaoMap() {
               }
             });
           } else {
+            // 지도 빈 곳 클릭 시에도 선택 해제
             resetSelection();
           }
         };
@@ -74,8 +70,17 @@ export default function KakaoMap() {
           }
         };
 
+        // ★ 모바일에서만 드래그 시 모든 선택 해제
+        const handleDragStart = () => {
+          if (window.innerWidth <= 768) {
+            const { resetSelection } = handlersRef.current;
+            resetSelection();
+          }
+        };
+
         window.kakao.maps.event.addListener(map, 'click', handleClick);
         window.kakao.maps.event.addListener(map, 'rightclick', handleRightClick);
+        window.kakao.maps.event.addListener(map, 'dragstart', handleDragStart);
         window.kakao.maps.event.addListener(map, 'zoom_changed', () => updateMapState());
         window.kakao.maps.event.addListener(map, 'idle', () => updateMapState());
 
@@ -96,7 +101,6 @@ export default function KakaoMap() {
     }
   }, []);
 
-  // 로드뷰 타일 표시 토글
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !window.kakao) return;
@@ -113,7 +117,6 @@ export default function KakaoMap() {
     }
   }, [isRoadviewMode]);
 
-  // 로드뷰 위치 표시용 워커(파란 원) 업데이트
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !window.kakao || !isRoadviewMode || !roadviewPosition) return;
@@ -130,7 +133,6 @@ export default function KakaoMap() {
     if (el) el.style.transform = `rotate(${roadviewHeading}deg)`;
   }, [isRoadviewMode, roadviewPosition, roadviewHeading]);
 
-  // 우클릭 빨간 핀
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !window.kakao) return;

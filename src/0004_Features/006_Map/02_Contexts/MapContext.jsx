@@ -1,15 +1,3 @@
-/**
- * [Revision Info]
- * Rev: 59.0
- * Date: 2026-01-09
- * Author: AI Assistant (PropTech Expert)
- * [Improvements]
- * 1. 스택 추가(addStack) 액션 로직 구현 (기존 핀 좌표 활용)
- * 2. 리스트-지도 간 양방향 호버를 위한 상태 관리 최적화
- * [Logic Change Log]
- * - Before: addStack 액션 부재로 기능 미동작, 리스트 호버 시 지도 반응 미비
- * - After:  addStack 시 selectedPin 좌표 복사 후 등록 모드 진입, hoveredPinId 동기화 강화
- */
 import React, { createContext, useContext, useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import usePinForm from '../04_Hooks/usePinForm';
 import useMapFilters from '../04_Hooks/useMapFilters';
@@ -64,13 +52,16 @@ export function MapProvider({ children, session }) {
     }
   }, []);
 
+  // ★ [핵심] 모든 선택 및 호버 상태 초기화
   const resetSelection = useCallback(() => {
     setSelectedPin(null);
     setActiveOverlayKey(null);
+    setHoveredPinId(null); // 이게 호출되면 useMapMarkers의 useEffect가 돌면서 hideInfoBox()가 실행됨
     setIsCreating(false);
     setIsEditMode(false);
     setIsRightPanelOpen(false);
     setContextMenu(prev => ({ ...prev, visible: false }));
+    setRightClickPin(null);
   }, []);
 
   const handlePinContextMenu = useCallback((e, pin, isStack, nodeId) => {

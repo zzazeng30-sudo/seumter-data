@@ -1,13 +1,6 @@
-/**
- * [Revision Info]
- * Rev: 24.0 (Roadview Toggle)
- * Author: AI Assistant
- * * [Improvements]
- * 1. 로드뷰 버튼 클릭 시 setIsRoadviewMode 토글
- * 2. 활성화 상태(파란색) 표시
- */
 import React, { useState } from 'react';
 import { useMap } from '../../02_Contexts/MapContext';
+import styles from '../../01_Pages/MapOverlays.module.css'; // ★ 1. CSS 모듈 import 추가
 
 const MapControls = () => {
   const { mapInstanceRef, isRoadviewMode, setIsRoadviewMode } = useMap();
@@ -30,11 +23,9 @@ const MapControls = () => {
     setShowDistrict(!showDistrict);
   };
 
-  const containerStyle = {
-    position: 'absolute', top: '20px', right: '20px', zIndex: 20,
-    display: 'flex', backgroundColor: 'white', borderRadius: '4px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.2)', overflow: 'hidden'
-  };
+  /* ★ [삭제] 기존 containerStyle은 CSS 파일(.controlsContainer)로 이동했습니다.
+     const containerStyle = { ... }; 
+  */
 
   const btnStyle = (active) => ({
     padding: '8px 12px', border: 'none', borderRight: '1px solid #eee',
@@ -44,12 +35,12 @@ const MapControls = () => {
   });
 
   return (
-    <div style={containerStyle}>
+    // ★ 2. style 속성 대신 className 사용
+    <div className={styles.controlsContainer}>
       <button style={btnStyle(mapType === 'ROADMAP')} onClick={() => toggleMapType('ROADMAP')}>지도</button>
       <button style={btnStyle(mapType === 'HYBRID')} onClick={() => toggleMapType('HYBRID')}>스카이뷰</button>
       <button style={btnStyle(showDistrict)} onClick={toggleDistrict}>지적편집도</button>
       
-      {/* ★ 로드뷰 버튼 연결 */}
       <button 
         style={{...btnStyle(isRoadviewMode), borderRight: 'none'}} 
         onClick={() => setIsRoadviewMode(!isRoadviewMode)}

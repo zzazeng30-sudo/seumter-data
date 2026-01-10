@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../0005_Lib/supabaseClient';
 
 // 페이지 컴포넌트들
@@ -10,155 +10,141 @@ import MyPage from '../../0004_Features/007_MyPage/MyPage';
 import ConsultationLogPage from '../../0004_Features/002_Consultation/ConsultationLogPage';
 import PropertyPage from '../../0004_Features/008_Property/PropertyPage';
 
-import styles from './MainLayout.module.css';
-
-// 메뉴 데이터 (isMap: true 옵션이 중요합니다)
 const menuData = {
   '대시보드': [
     { id: 'dashboard-schedule', name: '스케줄표', component: <DashboardPage /> },
-    { id: 'dashboard-new', name: '신규 현황', component: <DashboardPage /> }, 
-    { id: 'dashboard-list', name: '매물 등록', component: <PropertyPage />, isMap: true }, 
-    { id: 'dashboard-stats', name: '경영통계', component: <DashboardPage /> }, 
+    { id: 'dashboard-list', name: '매물 등록', component: <PropertyPage />, isMap: true },
   ],
   '매물': [
     { id: 'prop-map', name: '매물 지도', component: <MapPage />, isMap: true, mode: 'manage' },
     { id: 'prop-list', name: '매물 리스트', component: <PropertyPage />, isMap: true },
   ],
   '고객': [
-    { id: 'cust-upload', name: '고객 추가' },
+    { id: 'cust-add', name: '고객 추가' }, 
     { id: 'cust-manage', name: '고객 관리', component: <CustomerPage />, isMap: true },
-    { id: 'cust-log', name: '상담 관리', component: <ConsultationLogPage />, isMap: true }, 
+    { id: 'cust-log', name: '상담 관리', component: <ConsultationLogPage />, isMap: true },
   ],
   '계약': [
-    { id: 'cont-list', name: '계약 리스트', component: <ContractPage />, isMap: true }, 
-    { id: 'cont-upload', name: '계약서 작성' },
+    { id: 'cont-list', name: '계약 리스트', component: <ContractPage />, isMap: true },
   ],
   '마이페이지': [
     { id: 'my-info', name: '내정보 수정', component: <MyPage />, isMyPage: true },
-    { id: 'my-staff', name: '직원 관리', component: <MyPage />, isMyPage: true },
-    { id: 'my-payment', name: '결제 관리' },
-  ],
-  '고객센터': [
-    { id: 'sup-notice', name: '공지사항' },
-    { id: 'sup-qna', name: '1:1 문의하기' },
-  ],
-  '사용방법': [
-    { id: 'guide-main', name: '사용방법' },
   ]
 };
 
-const mainMenus = ['대시보드', '매물', '고객', '계약', '마이페이지', '고객센터', '사용방법'];
+const mainMenus = ['대시보드', '매물', '고객', '계약', '마이페이지'];
 
 export default function MainLayout({ session }) {
-  const [activeMainMenu, setActiveMainMenu] = useState(mainMenus[1]); 
+  const [activeMainMenu, setActiveMainMenu] = useState(mainMenus[1]);
   const [activeSubMenu, setActiveSubMenu] = useState(menuData[mainMenus[1]][0].id);
   const [customerModalTrigger, setCustomerModalTrigger] = useState(0);
+  const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
-  // ★ 현재 활성화된 페이지 정보 찾기 (여기가 중요)
-  const currentSubMenuList = menuData[activeMainMenu];
-  const currentPage = currentSubMenuList.find(menu => menu.id === activeSubMenu);
-  // 현재 페이지가 지도(Map) 속성을 가지고 있는지 확인
-  const isMapMode = currentPage?.isMap; 
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error('로그아웃 오류:', error);
-  };
+  const isMobile = windowWidth <= 768;
+  const currentSubList = menuData[activeMainMenu] || [];
+  const currentPage = (activeSubMenu === 'cust-add' || activeSubMenu === 'cust-manage')
+    ? currentSubList.find(m => m.id === 'cust-manage') 
+    : (currentSubList.find(m => m.id === activeSubMenu) || currentSubList[0]);
 
-  const handleMainMenuClick = (menuName) => {
-    setActiveMainMenu(menuName);
-    if (menuName === '고객') {
-      setActiveSubMenu('cust-manage'); 
-    } else {
-      setActiveSubMenu(menuData[menuName][0].id);
-    }
-  };
+  const isMapMode = currentPage?.isMap;
 
-  const handleSubMenuClick = (menuId) => {
-    if (menuId === 'cust-upload') {
-      setActiveSubMenu('cust-manage'); 
-      setCustomerModalTrigger(prev => prev + 1); 
-    } else {
-      setActiveSubMenu(menuId); 
-    }
-  };
-
-  const renderPageContent = () => {
-    if (currentPage && currentPage.component) {
-      let propsToPass = { session };
-
-      if (currentPage.isMyPage) {
-          const tabId = currentPage.id === 'my-info' ? 'info' : 
-                        currentPage.id === 'my-staff' ? 'staff' : 'info';
-          propsToPass.initialTab = tabId;
-      } 
-      
-      if (currentPage.mode) {
-          propsToPass.mode = currentPage.mode;
-      }
-      
-      if (currentPage.id === 'cust-manage') {
-          propsToPass.modalTrigger = customerModalTrigger;
-      }
-
-      // 컴포넌트 복제 및 props 전달
-      return React.cloneElement(currentPage.component, propsToPass);
-    }
-
-    return (
-      <div className={styles.pageContainer}>
-        <h1 className={styles.pageTitle}>{currentPage ? currentPage.name : '준비중'}</h1>
-        <p>준비 중인 페이지입니다.</p>
-      </div>
-    );
+  // 스타일 객체
+  const s = {
+    layout: { display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', overflow: 'hidden', backgroundColor: '#fff' },
+    // 메인 메뉴: 가로 스크롤
+    mainBar: { 
+      display: 'flex', overflowX: 'auto', whiteSpace: 'nowrap', borderBottom: '1px solid #eee', 
+      flexShrink: 0, padding: '0 10px', scrollbarWidth: 'none', msOverflowStyle: 'none' 
+    },
+    // 서브 메뉴: 가로 스크롤
+    subBar: { 
+      display: 'flex', overflowX: 'auto', whiteSpace: 'nowrap', borderBottom: '1px solid #f5f5f5', 
+      flexShrink: 0, padding: '0 10px', backgroundColor: '#fafafa' 
+    },
+    tab: { 
+      padding: isMobile ? '12px 15px' : '15px 20px', fontSize: isMobile ? '14px' : '15px', 
+      border: 'none', background: 'none', cursor: 'pointer', flexShrink: 0 
+    },
+    subTab: { 
+      padding: '10px 12px', fontSize: '13px', border: 'none', background: 'none', 
+      cursor: 'pointer', flexShrink: 0 
+    },
+    // 컨텐츠 영역: 지도일 때 꽉 차게
+    content: { flex: 1, overflow: isMapMode ? 'hidden' : 'auto', position: 'relative' }
   };
 
   return (
-    <div className={styles.layoutContainer}>
-      
-      <header className={styles.mainMenuBar}>
-        <nav className={styles.mainMenuTabs}>
-          {mainMenus.map(menuName => (
-            <button
-              key={menuName}
-              className={`${styles.mainMenuTab} ${activeMainMenu === menuName ? styles.active : ''}`}
-              onClick={() => handleMainMenuClick(menuName)}
-            >
-              {menuName}
-            </button>
-          ))}
-        </nav>
-        
-        <div className={styles.mainMenuUserInfo}>
-          <span className={styles.mainMenuUserEmail}>{session.user.email} 님</span>
-          <button className={styles.logoutButton} onClick={handleLogout}>로그아웃</button>
-        </div>
-      </header>
-
-      <nav className={styles.subMenuBar}>
-        {menuData[activeMainMenu].map(menuItem => (
-          <button
-            key={menuItem.id}
-            className={`${styles.subMenuTab} ${activeSubMenu === menuItem.id ? styles.active : ''}`}
-            onClick={() => handleSubMenuClick(menuItem.id)}
+    <div style={s.layout}>
+      <header style={s.mainBar} className="no-scrollbar">
+        {mainMenus.map(m => (
+          <button 
+            key={m} 
+            style={{ ...s.tab, fontWeight: activeMainMenu === m ? 'bold' : 'normal', color: activeMainMenu === m ? '#2563eb' : '#555' }}
+            onClick={() => { setActiveMainMenu(m); setActiveSubMenu(menuData[m][0].id); }}
           >
-            {menuItem.name}
+            {m}
           </button>
         ))}
+      </header>
+
+      <nav style={s.subBar} className="no-scrollbar">
+        {currentSubList.map(sub => {
+          let isTabActive = activeSubMenu === sub.id;
+          if (sub.id === 'cust-add') isTabActive = isCustomerModalVisible;
+          if (sub.id === 'cust-manage') isTabActive = (activeSubMenu === 'cust-manage' && !isCustomerModalVisible);
+
+          return (
+            <button 
+              key={sub.id} 
+              style={{ ...s.subTab, color: isTabActive ? '#2563eb' : '#777', fontWeight: isTabActive ? 'bold' : 'normal' }}
+              onClick={() => {
+                if(sub.id === 'cust-add') {
+                  setActiveSubMenu('cust-manage');
+                  setCustomerModalTrigger(prev => prev + 1);
+                  setIsCustomerModalVisible(true);
+                } else {
+                  setActiveSubMenu(sub.id);
+                  setIsCustomerModalVisible(false);
+                }
+              }}
+            >
+              {sub.name}
+            </button>
+          );
+        })}
       </nav>
 
-      {/* ★ 핵심 수정: 지도가 있는 페이지면 'fullContentArea' 스타일 적용 (여백 제거) */}
-      <main className={isMapMode ? styles.fullContentArea : styles.contentArea}>
-        {renderPageContent()}
+      <main style={s.content}>
+        {currentPage?.component && React.cloneElement(currentPage.component, { 
+          session,
+          modalTrigger: customerModalTrigger,
+          onModalClose: () => { setIsCustomerModalVisible(false); setCustomerModalTrigger(0); }
+        })}
       </main>
 
-      {/* 지도 모드일 때는 푸터를 숨기거나, 필요하면 보여줄 수 있음 (여기선 유지) */}
-      {!isMapMode && (
-        <footer className={styles.footer}>
-          <p>&copy; {new Date().getFullYear()} 사장님 CRM. All rights reserved.</p>
-        </footer>
-      )}
-
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        /* 지도가 모바일에서 데스크탑처럼 보이는 현상을 수정하기 위한 CSS */
+        @media (max-width: 768px) {
+          /* 왼쪽 패널 너비 조정 (MapPage 내부 클래스가 있다면 해당 클래스명으로 조절 필요) */
+          [class*="sidePanel"], [class*="listPanel"] {
+            width: 100% !important;
+            height: 40% !important;
+            position: absolute !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            z-index: 10 !important;
+            border-radius: 20px 20px 0 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,67 +1,82 @@
 /**
  * [Revision Info]
- * Rev: 1.3
- * Date: 2026-01-08
+ * Rev: 1.4
+ * Date: 2026-01-10
  * Author: AI Assistant
- * * [Logic Change Log]
- * - Before: import { customerService } from '../../../services/customerService'; (경로 오류)
- * - After: import { customerService } from '../../services/customerService'; (경로 수정)
+ * [Logic Change Log]
+ * - 모달 종료 시 MainLayout의 탭 상태를 복구하기 위한 onModalClose 추가
+ * - modalTrigger 감시 로직 최적화 (useRef 대신 단순 비교 및 탭 동기화)
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './CustomerPage.module.css'; 
 import CustomerAddModal from './CustomerAddModal.jsx'; 
-// [수정됨] 상위 폴더(004_Customer) -> 상위(0004_Features) -> src 로 가야 하므로 ../../ 입니다.
 import { customerService } from '../../services/customerService';
 
-export default function CustomerPage({ session, modalTrigger }) {
+export default function CustomerPage({ session, modalTrigger, onModalClose }) {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const prevModalTriggerRef = useRef(modalTrigger);
-
+  // 1. 외부(MainLayout)에서 모달 트리거 값이 변경될 때 모달 열기
   useEffect(() => {
-    if (modalTrigger > 0 && modalTrigger !== prevModalTriggerRef.current) {
+    if (modalTrigger > 0) {
       setIsModalOpen(true);
     }
-    prevModalTriggerRef.current = modalTrigger;
   }, [modalTrigger]);
 
-  // 1. (Read) 고객 읽어오기 - Service 사용
+  // 2. 고객 목록 로드 (Read)
   const fetchCustomers = async () => {
     setLoading(true);
-    const { data, error } = await customerService.getCustomers();
-      
-    if (error) console.error('고객 로드 오류:', error.message);
-    else setCustomers(data || []);
-    
-    setLoading(false);
+    try {
+      const { data, error } = await customerService.getCustomers();
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (error) {
+      console.error('고객 로드 오류:', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchCustomers();
   }, []);
 
-  // 3. (Delete) 고객 삭제 - Service 사용
+  // 3. 고객 삭제 (Delete)
   const handleDeleteCustomer = async (customerId) => {
+    if (!window.confirm('정말 삭제하시겠습니까?')) return;
+    
     setLoading(true);
     const { error } = await customerService.deleteCustomer(customerId);
     
     if (error) {
       console.error('고객 삭제 오류:', error.message);
     } else {
-      setCustomers(currentCustomers => currentCustomers.filter(c => c.id !== customerId));
+      setCustomers(current => current.filter(c => c.id !== customerId));
     }
     setLoading(false);
   };
 
+  // 4. 모달 닫기 핸들러 (MainLayout과 탭 상태 동기화)
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    // 모달이 닫힐 때 부모 레이아웃의 '고객 추가' 탭 활성화를 '고객 관리'로 돌려줌
+    if (onModalClose) {
+      onModalClose();
+    }
+  };
+
   return (
     <main className={styles.pageContainerList}>
+      {/* 고객 등록 모달 */}
       {isModalOpen && (
         <CustomerAddModal 
           session={session} 
-          onClose={() => setIsModalOpen(false)} 
-          onAddSuccess={() => fetchCustomers()} 
+          onClose={handleCloseModal} 
+          onAddSuccess={() => {
+            fetchCustomers();
+            handleCloseModal();
+          }} 
         />
       )}
 
@@ -78,7 +93,7 @@ export default function CustomerPage({ session, modalTrigger }) {
           </button>
         </div>
         
-        {loading && <p>고객 목록을 불러오는 중...</p>}
+        {loading && <p>목록을 처리 중입니다...</p>}
         {!loading && customers.length === 0 && (
           <p className={styles.emptyText}>등록된 고객이 없습니다.</p>
         )}
