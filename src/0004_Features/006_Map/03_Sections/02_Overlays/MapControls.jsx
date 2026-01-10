@@ -1,52 +1,90 @@
+/* src/0004_Features/006_Map/03_Sections/02_Overlays/MapControls.jsx */
 import React, { useState } from 'react';
 import { useMap } from '../../02_Contexts/MapContext';
-import styles from '../../01_Pages/MapOverlays.module.css'; // ★ 1. CSS 모듈 import 추가
+import styles from '../../01_Pages/MapOverlays.module.css';
 
 const MapControls = () => {
+  // 컨텍스트에서 필요한 값들 가져오기
   const { mapInstanceRef, isRoadviewMode, setIsRoadviewMode } = useMap();
+  
+  // 내부 로컬 상태 (버튼 활성화 표시용)
   const [mapType, setMapType] = useState('ROADMAP'); 
   const [showDistrict, setShowDistrict] = useState(false); 
 
-  const toggleMapType = (type) => {
+  // 1. 지도 vs 스카이뷰 토글
+  const handleMapType = (e, type) => {
+    e.stopPropagation();
     const map = mapInstanceRef.current;
     if (!map || !window.kakao) return;
-    const mapTypeControl = type === 'ROADMAP' ? window.kakao.maps.MapTypeId.ROADMAP : window.kakao.maps.MapTypeId.HYBRID;
-    map.setMapTypeId(mapTypeControl);
+
+    const kakaoType = type === 'ROADMAP' 
+      ? window.kakao.maps.MapTypeId.ROADMAP 
+      : window.kakao.maps.MapTypeId.HYBRID;
+    
+    map.setMapTypeId(kakaoType);
     setMapType(type);
   };
 
-  const toggleDistrict = () => {
+  // 2. 지적편집도 vs 로드뷰 (배타적 선택 로직 포함)
+  const handleOverlay = (e, mode) => {
+    e.stopPropagation();
     const map = mapInstanceRef.current;
     if (!map || !window.kakao) return;
-    if (!showDistrict) map.addOverlayMapTypeId(window.kakao.maps.MapTypeId.USE_DISTRICT);
-    else map.removeOverlayMapTypeId(window.kakao.maps.MapTypeId.USE_DISTRICT);
-    setShowDistrict(!showDistrict);
+
+    if (mode === 'district') {
+      const nextState = !showDistrict;
+      if (nextState) {
+        map.addOverlayMapTypeId(window.kakao.maps.MapTypeId.USE_DISTRICT);
+        setIsRoadviewMode(false); // 지적도 켜면 로드뷰 끔
+      } else {
+        map.removeOverlayMapTypeId(window.kakao.maps.MapTypeId.USE_DISTRICT);
+      }
+      setShowDistrict(nextState);
+    } 
+    else if (mode === 'roadview') {
+      const nextState = !isRoadviewMode;
+      if (nextState) {
+        // 로드뷰를 켤 때 지적도가 켜져있다면 끔
+        map.removeOverlayMapTypeId(window.kakao.maps.MapTypeId.USE_DISTRICT);
+        setShowDistrict(false);
+      }
+      setIsRoadviewMode(nextState);
+    }
   };
 
-  /* ★ [삭제] 기존 containerStyle은 CSS 파일(.controlsContainer)로 이동했습니다.
-     const containerStyle = { ... }; 
-  */
-
-  const btnStyle = (active) => ({
-    padding: '8px 12px', border: 'none', borderRight: '1px solid #eee',
-    backgroundColor: active ? '#2563eb' : 'white',
-    color: active ? 'white' : '#333',
-    cursor: 'pointer', fontSize: '13px', fontWeight: '600'
-  });
-
   return (
-    // ★ 2. style 속성 대신 className 사용
-    <div className={styles.controlsContainer}>
-      <button style={btnStyle(mapType === 'ROADMAP')} onClick={() => toggleMapType('ROADMAP')}>지도</button>
-      <button style={btnStyle(mapType === 'HYBRID')} onClick={() => toggleMapType('HYBRID')}>스카이뷰</button>
-      <button style={btnStyle(showDistrict)} onClick={toggleDistrict}>지적편집도</button>
-      
-      <button 
-        style={{...btnStyle(isRoadviewMode), borderRight: 'none'}} 
-        onClick={() => setIsRoadviewMode(!isRoadviewMode)}
-      >
-        로드뷰
-      </button>
+    <div className={styles.controlsContainer} onClick={(e) => e.stopPropagation()}>
+      {/* 그룹 1: 지도/스카이 */}
+      <div className={styles.controlGroup}>
+        <button 
+          className={`${styles.controlBtn} ${mapType === 'ROADMAP' ? styles.controlBtnActive : ''}`}
+          onClick={(e) => handleMapType(e, 'ROADMAP')}
+        >
+          <span>지도</span>
+        </button>
+        <button 
+          className={`${styles.controlBtn} ${mapType === 'HYBRID' ? styles.controlBtnActive : ''}`}
+          onClick={(e) => handleMapType(e, 'HYBRID')}
+        >
+          <span>스카이</span>
+        </button>
+      </div>
+
+      {/* 그룹 2: 지적/로드 */}
+      <div className={styles.controlGroup}>
+        <button 
+          className={`${styles.controlBtn} ${showDistrict ? styles.controlBtnActive : ''}`}
+          onClick={(e) => handleOverlay(e, 'district')}
+        >
+          <span>지적</span>
+        </button>
+        <button 
+          className={`${styles.controlBtn} ${isRoadviewMode ? styles.controlBtnActive : ''}`}
+          onClick={(e) => handleOverlay(e, 'roadview')}
+        >
+          <span>로드</span>
+        </button>
+      </div>
     </div>
   );
 };
