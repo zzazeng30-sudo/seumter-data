@@ -1,11 +1,8 @@
 /**
  * [Revision Info]
- * Rev: 11.0 (Fix Import Error)
- * Date: 2026-01-08
- * Author: AI Assistant
- * * [Fix]
- * 1. useMap 통합 훅 적용
- * 2. 상세 정보 표시 및 수정 모드 전환 기능
+ * Rev: 12.0 (Add Stack Registration)
+ * - '스택 추가' 버튼 생성
+ * - useMap에서 startStackRegistration 함수 연동
  */
 
 import React from 'react';
@@ -17,7 +14,8 @@ const PinDetail = () => {
     selectedPin, 
     setSelectedPin, 
     setIsEditMode,
-    fetchPins 
+    fetchPins,
+    startStackRegistration // ★ Context에서 스택 등록 함수 가져오기
   } = useMap();
 
   if (!selectedPin) return null;
@@ -32,40 +30,75 @@ const PinDetail = () => {
   };
 
   const getPrice = () => {
-    if (selectedPin.is_sale) return `매매 ${Number(selectedPin.sale_price).toLocaleString()}만원`;
-    if (selectedPin.is_jeonse) return `전세 ${Number(selectedPin.jeonse_deposit).toLocaleString()}만원`;
-    if (selectedPin.is_rent) return `월세 ${Number(selectedPin.rent_deposit).toLocaleString()} / ${Number(selectedPin.rent_amount).toLocaleString()}만원`;
+    const fmt = (n) => Number(n || 0).toLocaleString();
+    if (selectedPin.is_sale) return `매매 ${fmt(selectedPin.sale_price)}만원`;
+    if (selectedPin.is_jeonse) return `전세 ${fmt(selectedPin.jeonse_deposit)}만원`;
+    if (selectedPin.is_rent) return `월세 ${fmt(selectedPin.rent_deposit)} / ${fmt(selectedPin.rent_amount)}만원`;
     return '-';
   };
 
   return (
     <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>매물 상세</h2>
-        <button onClick={() => setSelectedPin(null)} style={{ border: 'none', background: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: 0 }}>매물 상세</h2>
+        <button onClick={() => setSelectedPin(null)} style={{ border: 'none', background: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#666' }}>&times;</button>
       </div>
 
-      <div style={{ margin: '20px 0', padding: '15px', background: '#f9f9f9', borderRadius: '8px' }}>
-        <div style={{ color: '#2563eb', fontWeight: 'bold', marginBottom: '5px' }}>{selectedPin.property_type}</div>
-        <h3 style={{ margin: '0 0 10px 0' }}>{selectedPin.building_name || selectedPin.address}</h3>
-        <p style={{ color: '#555' }}>{selectedPin.address} {selectedPin.detailed_address}</p>
-        <p style={{ fontWeight: 'bold', fontSize: '1.1rem', marginTop: '10px' }}>{getPrice()}</p>
-        <p style={{ marginTop: '10px', whiteSpace: 'pre-wrap' }}>{selectedPin.notes}</p>
+      <div style={{ margin: '20px 0', padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'inline-block', padding: '4px 8px', borderRadius: '4px', background: '#eff6ff', color: '#2563eb', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '8px' }}>
+          {selectedPin.property_type || '매물'}
+        </div>
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', color: '#1e293b' }}>
+          {selectedPin.title || selectedPin.building_name || selectedPin.address}
+        </h3>
+        <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '15px' }}>
+          {selectedPin.address} {selectedPin.detailed_address}
+        </p>
+        
+        <div style={{ padding: '15px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <p style={{ fontWeight: 'bold', fontSize: '1.1rem', margin: 0, color: '#059669' }}>
+            {getPrice()}
+          </p>
+        </div>
+
+        <p style={{ marginTop: '15px', whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#334155', fontSize: '0.95rem' }}>
+          {selectedPin.notes || '상세 메모가 없습니다.'}
+        </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* ★ [추가됨] 스택 추가 버튼 */}
         <button 
-          onClick={() => setIsEditMode(true)}
-          style={{ flex: 1, padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          onClick={() => startStackRegistration(selectedPin)}
+          style={{ 
+            width: '100%', 
+            padding: '12px', 
+            background: '#10b981', // 초록색 계열로 구분
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '6px', 
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '1rem'
+          }}
         >
-          수정
+          + 이 건물에 매물(스택) 추가
         </button>
-        <button 
-          onClick={handleDelete}
-          style={{ flex: 1, padding: '10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          삭제
-        </button>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => setIsEditMode(true)}
+            style={{ flex: 1, padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            수정
+          </button>
+          <button 
+            onClick={handleDelete}
+            style={{ flex: 1, padding: '10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            삭제
+          </button>
+        </div>
       </div>
     </div>
   );

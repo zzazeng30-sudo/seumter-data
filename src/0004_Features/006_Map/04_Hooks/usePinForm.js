@@ -1,12 +1,12 @@
 /**
- * [Revision: 61.0]
- * - status 상태 추가: 거래전, 거래중, 거래완료
+ * [Revision: 62.0]
+ * - imageUrls 상태 추가: 사진 URL 목록 관리
  */
 import { useState, useCallback } from 'react';
 
 export default function usePinForm() {
   const [form, setForm] = useState({
-    status: '거래전', // 기본값 설정
+    status: '거래전',
     propertyType: '아파트',
     buildingName: '',
     address: '',
@@ -22,7 +22,8 @@ export default function usePinForm() {
     bathroomCount: '',
     floor: '',
     keywords: '',
-    notes: ''
+    notes: '',
+    imageUrls: [] // ★ 이미지 URL 배열 추가
   });
 
   const handleChange = useCallback((e) => {
@@ -52,7 +53,8 @@ export default function usePinForm() {
       bathroomCount: '',
       floor: '',
       keywords: '',
-      notes: ''
+      notes: '',
+      imageUrls: [] // 초기화
     });
   }, []);
 
@@ -75,7 +77,8 @@ export default function usePinForm() {
       bathroomCount: pin.bathroom_count || '',
       floor: pin.floor || '',
       keywords: pin.keywords || '',
-      notes: pin.notes || ''
+      notes: pin.notes || '',
+      imageUrls: pin.image_urls || [] // 기존 이미지 로드
     });
   }, []);
 

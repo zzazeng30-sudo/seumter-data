@@ -1,20 +1,19 @@
-/**
- * [Revision Info]
- * Rev: 1.0
- * Date: 2026-01-08
- * Author: AI Assistant
- * * [Improvements]
- * 1. Supabase Auth 로직 중앙화
- * 2. 에러 핸들링 표준화 가능
- */
 import { supabase } from '../0005_Lib/supabaseClient';
 
 export const authService = {
-  // 회원가입
-  signUp: async ({ email, password }) => {
+  // [수정] 회원가입 시 추가 정보(이름, 주소, 연락처, 직책)를 받아서 저장
+  signUp: async ({ email, password, full_name, address, phone_number, job_title }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name,
+          address,
+          phone_number,
+          job_title,
+        },
+      },
     });
     return { data, error };
   },

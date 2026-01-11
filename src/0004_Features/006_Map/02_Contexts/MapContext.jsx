@@ -1,3 +1,8 @@
+/**
+ * [Revision: 56.0]
+ * - 스택 매물 등록 모드 지원 추가 (isStackMode, stackParentPin)
+ * - startStackRegistration, closeStackMode 함수 추가
+ */
 import React, { createContext, useContext, useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import usePinForm from '../04_Hooks/usePinForm';
 import useMapFilters from '../04_Hooks/useMapFilters';
@@ -37,6 +42,10 @@ export function MapProvider({ children, session }) {
   const [isCreating, setIsCreating] = useState(false);
   const [rightClickPin, setRightClickPin] = useState(null);
 
+  // ★ [추가] 스택 등록 모드 관련 상태
+  const [isStackMode, setIsStackMode] = useState(false);
+  const [stackParentPin, setStackParentPin] = useState(null);
+
   const [isRoadviewMode, setIsRoadviewMode] = useState(false);
   const [roadviewPosition, setRoadviewPosition] = useState(null);
   const [roadviewHeading, setRoadviewHeading] = useState(0);
@@ -52,30 +61,45 @@ export function MapProvider({ children, session }) {
     }
   }, []);
 
+  // ★ [추가] 스택 등록 시작 함수
+  const startStackRegistration = useCallback((parentPin) => {
+    setStackParentPin(parentPin);
+    setIsStackMode(true);
+    // 기존 선택 해제 (오른쪽 패널 전환을 위해)
+    setSelectedPin(null);
+    setIsCreating(false);
+    setIsEditMode(false);
+    setIsRightPanelOpen(true); // 패널 열기
+  }, []);
+
+  // ★ [추가] 스택 등록 종료 함수
+  const closeStackMode = useCallback(() => {
+    setIsStackMode(false);
+    setStackParentPin(null);
+    setIsRightPanelOpen(false); // 패널 닫기 (필요시)
+  }, []);
+
   /**
    * ★ [수정 및 강화] 매물 선택 또는 등록 모드 진입 시 지도 위치 보정 로직
-   * 1. 모바일에서 매물을 클릭했을 때 (selectedPin)
-   * 2. 모바일에서 매물 등록 버튼을 눌렀을 때 (isCreating)
-   * 위 두 상황에서 하단 패널에 의해 마커가 가려지지 않도록 중심점을 보정합니다.
    */
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !window.kakao) return;
 
-    // 보정 대상이 있는지 확인 (선택된 핀이 있거나, 우클릭으로 생성 중인 핀이 있는 경우)
-    const target = selectedPin || rightClickPin;
+    // 보정 대상이 있는지 확인 (선택된 핀, 우클릭 생성 중, 혹은 스택 등록 중)
+    const target = selectedPin || rightClickPin || (isStackMode ? stackParentPin : null);
     if (!target) return;
 
-    const lat = target.lat;
-    const lng = target.lng;
+    const lat = parseFloat(target.lat);
+    const lng = parseFloat(target.lng);
     const isMobile = window.innerWidth <= 768;
 
     if (isMobile) {
-      // 보정값 설정: 위도(lat)에서 값을 빼면 지도가 아래로 내려가고 핀이 위로 올라옵니다.
-      let latOffset = 0.002; // 기본 보정값 (상세 메모용)
+      // 보정값 설정
+      let latOffset = 0.002; 
 
-      if (isCreating) {
-        // 매물 등록 시에는 입력 패널이 더 높게 올라오므로 더 많이 보정합니다.
+      if (isCreating || isStackMode) {
+        // 등록 모드일 때는 패널이 더 높게 올라오므로 더 많이 보정
         latOffset = 0.0045; 
       }
 
@@ -86,7 +110,7 @@ export function MapProvider({ children, session }) {
       const moveLatLon = new window.kakao.maps.LatLng(lat, lng);
       map.panTo(moveLatLon);
     }
-  }, [selectedPin, isCreating, rightClickPin]); // isCreating과 rightClickPin 감지 추가
+  }, [selectedPin, isCreating, rightClickPin, isStackMode, stackParentPin]);
 
   const resetSelection = useCallback(() => {
     setSelectedPin(null);
@@ -97,6 +121,9 @@ export function MapProvider({ children, session }) {
     setIsRightPanelOpen(false);
     setContextMenu(prev => ({ ...prev, visible: false }));
     setRightClickPin(null);
+    // 스택 모드도 초기화
+    setIsStackMode(false);
+    setStackParentPin(null);
   }, []);
 
   const handlePinContextMenu = useCallback((e, pin, isStack, nodeId) => {
@@ -104,7 +131,6 @@ export function MapProvider({ children, session }) {
     setSelectedPin(pin);
     setActiveOverlayKey(nodeId);
     if (mapInstanceRef.current) {
-      // 지도는 위 useEffect에서 이동하므로 여기서는 panTo를 중복 호출하지 않습니다.
       const container = mapInstanceRef.current.getNode();
       const rect = container.getBoundingClientRect();
       setContextMenu({ visible: true, x: rect.width / 2 + 60, y: rect.height / 2 - 40, pinId: pin.id });
@@ -112,7 +138,6 @@ export function MapProvider({ children, session }) {
   }, []);
 
   const onMapRightClick = useCallback(({ latLng }) => {
-    // 우클릭 지점으로 이동
     if (mapInstanceRef.current) mapInstanceRef.current.panTo(latLng);
     
     setRightClickPin({ lat: latLng.getLat(), lng: latLng.getLng() });
@@ -125,12 +150,11 @@ export function MapProvider({ children, session }) {
     setContextMenu(prev => ({ ...prev, visible: false }));
     if (action === 'createPin') {
         setIsCreating(true);
-        // contextMenu에 저장된 좌표로 선택된 핀 설정
         setSelectedPin({ lat: contextMenu.latLng.getLat(), lng: contextMenu.latLng.getLng() });
     } else if (action === 'addStack') {
         if (selectedPin) {
-          setIsCreating(true);
-          setSelectedPin({ lat: selectedPin.lat, lng: selectedPin.lng, address: selectedPin.address });
+          // ★ 컨텍스트 메뉴에서 바로 스택 추가 시에도 사용 가능하도록 연결
+          startStackRegistration(selectedPin);
         }
     } else if (action === 'editPin') {
         setIsEditMode(true);
@@ -140,7 +164,7 @@ export function MapProvider({ children, session }) {
     } else if (action === 'roadview') {
         setIsRoadviewMode(true);
     }
-  }, [contextMenu, selectedPin, handleDeletePin]);
+  }, [contextMenu, selectedPin, handleDeletePin, startStackRegistration]);
 
   const mapVisuals = useMapMarkers({
     mapInstanceRef, isMapReady, displayNodes,
@@ -159,13 +183,19 @@ export function MapProvider({ children, session }) {
     isRoadviewMode, setIsRoadviewMode, roadviewPosition, setRoadviewPosition,
     roadviewHeading, setRoadviewHeading,
     handlePinContextMenu, onMapRightClick, resetSelection, rightClickPin,
+    
+    // ★ 스택 관련 상태 내보내기
+    isStackMode, stackParentPin, startStackRegistration, closeStackMode,
+
     ...mapVisuals
   }), [
     pins, loading, fetchPins, handleDeletePin, filterState, formState, session, isMapReady, zoomLevel, bounds, displayNodes,
     selectedPin, hoveredPinId, activeOverlayKey, contextMenu, isLeftPanelOpen, isRightPanelOpen, isEditMode, isCreating,
     isRoadviewMode, roadviewPosition, roadviewHeading,
     updateMapState, handleContextMenuAction, handlePinContextMenu, onMapRightClick,
-    resetSelection, rightClickPin, mapVisuals
+    resetSelection, rightClickPin, mapVisuals,
+    // 스택 의존성 추가
+    isStackMode, stackParentPin, startStackRegistration, closeStackMode
   ]);
 
   return <MapContext.Provider value={value}>{children}</MapContext.Provider>;

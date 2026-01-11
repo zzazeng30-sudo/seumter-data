@@ -1,12 +1,4 @@
-/**
- * [Revision Info]
- * Rev: 88.0 (Mobile Touch Fix)
- * - 핀/클러스터 터치 시 지도 드래그 이벤트(dragstart)가 발생하지 않도록 
- * touchstart에 e.stopPropagation() 추가
- * - 클릭 시 메모가 안 뜨는 현상 해결
- */
 import { useRef, useEffect } from 'react';
-import overlayStyles from '../01_Pages/MapOverlays.module.css';
 
 export default function useMapMarkers({ 
   mapInstanceRef, isMapReady, displayNodes, 
@@ -38,59 +30,71 @@ export default function useMapMarkers({
     // 2. 호버 정보창(InfoBox) 오버레이 생성
     if (!hoverOverlayRef.current) {
       const container = document.createElement('div');
-      container.style.display = 'none'; 
+      container.style.cssText = 'position: relative; background: transparent; border: none; margin: 0; padding: 0;';
+      
       hoverOverlayRef.current = new window.kakao.maps.CustomOverlay({
-        clickable: false, xAnchor: -0.2, yAnchor: 1.0, zIndex: 1000   
+        clickable: false, 
+        content: container,
+        xAnchor: 0.5, 
+        yAnchor: 2.0, 
+        zIndex: 9999 
       });
-      hoverOverlayRef.current.setContent(container);
-      hoverOverlayRef.current.setMap(map);
     }
 
-    // 호버 해제 시 정보창 닫기
-    if (!hoveredPinId) {
-       hideInfoBox();
-    }
+    if (!hoveredPinId) hideInfoBox();
 
-    // 3. 마커 렌더링 및 업데이트
+    // 3. 마커 렌더링
     displayNodes.forEach(node => {
+      if (!node.lat || !node.lng) return;
+
       const position = new window.kakao.maps.LatLng(node.lat, node.lng);
       let overlay = markersMapRef.current.get(node.id);
 
+      const isClusterNode = node.type === 'CLUSTER';
+      const anchorY = isClusterNode ? 0.5 : 1; 
+
       if (!overlay) {
         const content = document.createElement('div');
-        // clickable: true로 설정하여 지도 클릭 이벤트를 막으려 시도하지만,
-        // 모바일 터치 드래그는 별도 처리가 필요함
+        
+        content.style.width = isClusterNode ? '42px' : '32px';
+        content.style.height = '42px';
+        content.style.position = 'relative'; 
+
         overlay = new window.kakao.maps.CustomOverlay({ 
-          position, content, yAnchor: 1, zIndex: 100, clickable: true 
+          position, 
+          content, 
+          yAnchor: anchorY, 
+          zIndex: 100, 
+          clickable: true 
         });
         overlay.setMap(map);
         markersMapRef.current.set(node.id, overlay);
       }
 
       const content = overlay.getContent();
-      
-      // ★ [핵심] 핀을 터치할 때 지도가 드래그(dragstart -> resetSelection)되는 것을 방지
-      content.ontouchstart = (e) => {
-        e.stopPropagation(); 
-      };
+      content.ontouchstart = (e) => { e.stopPropagation(); };
 
       const items = node.items || (node.data ? [node.data] : []);
       const itemIds = items.map(i => String(i.id));
       
       const isHovered = Array.isArray(hoveredPinId) 
         ? (itemIds.length === hoveredPinId.length && itemIds.every(id => hoveredPinId.map(String).includes(id)))
-        : (hoveredPinId && itemIds.includes(String(hoveredPinId)));
+        : (String(hoveredPinId) === String(node.data?.id || node.items?.[0]?.id));
 
-      if (node.type === 'CLUSTER') {
+      // ----------------------------------------------------------------
+      // CLUSTER (원형)
+      // ----------------------------------------------------------------
+      if (isClusterNode) {
         const stateKey = `cluster-${items.length}-${isHovered}`;
         if (content.dataset.state !== stateKey) {
-          content.style.cssText = `width:42px; height:42px; cursor:pointer; transition: all 0.2s ease; display:flex; align-items:center; justify-content:center;`;
+          content.style.cssText = `width:42px; height:42px; cursor:pointer; display:flex; align-items:center; justify-content:center; transform-origin: center; transition: transform 0.2s ease; position: relative;`;
           content.style.transform = isHovered ? 'scale(1.15)' : 'scale(1)';
+          
           content.innerHTML = `
-            <div style="width: 100%; height: 100%; border-radius: 50%; background: #3b82f6;
-              border: ${isHovered ? '2.5px dashed #ff0000' : '2px solid white'};
-              box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;
-              color: white; font-weight: 800; font-size: 14px;">
+            <div style="width:100%; height:100%; border-radius:50%; background:#3b82f6;
+              border:${isHovered ? '2.5px dashed #ff0000' : '2px solid white'};
+              color:white; font-weight:800; font-size:14px; display:flex; justify-content:center; align-items:center;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
               ${items.length}
             </div>
           `;
@@ -110,8 +114,11 @@ export default function useMapMarkers({
           e.stopPropagation(); 
           map.setBounds(new window.kakao.maps.LatLngBounds().extend(position), 80); 
         };
-      } else {
-        // SINGLE or STACK
+      } 
+      // ----------------------------------------------------------------
+      // SINGLE / STACK (핀 모양)
+      // ----------------------------------------------------------------
+      else {
         const mainPin = node.type === 'SINGLE' ? node.data : node.items[0];
         const isSelected = selectedPin?.id === mainPin.id || activeOverlayKey === node.id;
         const statusColor = getStatusColor(mainPin.status);
@@ -120,19 +127,16 @@ export default function useMapMarkers({
 
         const stateKey = `${isSelected}-${isHovered}-${statusColor}-${isStack}`;
         if (content.dataset.state !== stateKey) {
-          content.style.cssText = `width: 32px; height: 42px; cursor: pointer; position: relative; display: flex; flex-direction: column; align-items: center; transition: transform 0.1s ease;`;
+          content.style.cssText = `width: 32px; height: 42px; cursor: pointer; display: flex; flex-direction: column; align-items: center; transform-origin: bottom center; transition: transform 0.1s ease; position: relative;`;
           content.style.transform = isHovered ? 'scale(1.2)' : 'scale(1)';
           
           content.innerHTML = `
-            <svg width="32" height="42" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="overflow: visible;">
+            <svg width="32" height="42" viewBox="0 0 24 32" style="overflow: visible;">
               <path d="M12 32C12 32 24 18.5 24 12C24 5.37258 18.6274 0 12 0C5.37258 0 0 5.37258 0 12C0 18.5 12 32 12 32Z" 
                   fill="${isSelected ? '#000' : (isStack ? '#10b981' : statusColor)}"
-                  stroke="${isHovered ? '#ff0000' : 'none'}" 
-                  stroke-width="2.5" stroke-dasharray="4 2"/>
+                  stroke="${isHovered ? '#ff0000' : 'none'}" stroke-width="2.5"/>
               <circle cx="12" cy="12" r="7" fill="white"/>
-              <text x="12" y="15" text-anchor="middle" fill="${isStack ? '#10b981' : '#333'}" font-size="${isStack ? '9' : '0'}" font-weight="900">
-                ${isStack ? items.length : ''}
-              </text>
+              ${isStack ? `<text x="12" y="16" text-anchor="middle" fill="#10b981" font-size="10" font-weight="900">${items.length}</text>` : ''}
             </svg>
           `;
           content.dataset.state = stateKey;
@@ -149,6 +153,18 @@ export default function useMapMarkers({
         };
         content.onclick = (e) => { 
           e.stopPropagation(); 
+          const isMobile = window.innerWidth <= 768;
+          if (isMobile) {
+            const isCurrentlyHovered = Array.isArray(hoveredPinId) 
+              ? hoveredPinId.map(String).includes(String(mainPin.id))
+              : String(hoveredPinId) === String(mainPin.id);
+
+            if (!isCurrentlyHovered) {
+              setHoveredPinId(mainPin.id);
+              showInfoBox(mainPin, position, isStack ? '#10b981' : statusColor);
+              return; 
+            }
+          }
           setSelectedPin(mainPin); 
           setActiveOverlayKey(node.id); 
           map.panTo(position); 
@@ -161,30 +177,89 @@ export default function useMapMarkers({
     });
   }, [displayNodes, isMapReady, selectedPin, hoveredPinId, activeOverlayKey]);
 
-  // 정보창 표시 함수
+  // ★ [수정됨] 거래 유형별 가격 표시 로직 (월세/보증금 구분)
   const showInfoBox = (pin, position, color) => {
-    if (!hoverOverlayRef.current) return;
+    if (!hoverOverlayRef.current || !mapInstanceRef.current) return;
+    
+    // 포맷터
     const fmt = (n) => {
       const num = Number(n || 0);
-      return num >= 10000 ? (num/10000).toFixed(1)+'억' : num.toLocaleString();
+      if (num === 0) return '';
+      return num >= 10000 
+        ? (num % 10000 === 0 ? `${num/10000}억` : `${(num/10000).toFixed(1)}억`) 
+        : num.toLocaleString();
     };
-    let typeStr = pin.is_sale ? '매매' : (pin.is_jeonse ? '전세' : '월세');
-    let priceDetail = pin.is_sale ? fmt(pin.sale_price) : pin.is_jeonse ? fmt(pin.jeonse_deposit) : `월${fmt(pin.rent_amount)}|보${fmt(pin.rent_deposit)}`;
+
+    const parts = [];
+
+    // 거래 유형별 표시 분기
+    if (pin.is_sale) {
+      // 매매: 매매가 + (보증금) + (권리금)
+      if (pin.sale_price) parts.push(`매${fmt(pin.sale_price)}`);
+      // 매매/전세일 때 폼의 '보증금'은 DB의 rent_amount 필드에 저장됨
+      if (pin.rent_amount) parts.push(`보${fmt(pin.rent_amount)}`);
+    } 
+    else if (pin.is_jeonse) {
+      // 전세: 전세금 + (보증금) + (권리금)
+      if (pin.jeonse_deposit) parts.push(`전${fmt(pin.jeonse_deposit)}`);
+      if (pin.rent_amount) parts.push(`보${fmt(pin.rent_amount)}`);
+    } 
+    else if (pin.is_rent) {
+      // 월세: 보증금 + 월세 + (권리금)
+      // 월세일 때 보증금은 rent_deposit 필드, 월세는 rent_amount 필드
+      if (pin.rent_deposit) parts.push(`보${fmt(pin.rent_deposit)}`);
+      if (pin.rent_amount) parts.push(`월${fmt(pin.rent_amount)}`);
+    }
+    
+    // 권리금은 공통적으로 있으면 표시
+    if (pin.key_money) parts.push(`권${fmt(pin.key_money)}`);
+
+    // 콤마(,)와 띄어쓰기로 연결
+    const priceDisplay = parts.length > 0 ? parts.join(', ') : '가격미정';
+    
     const keyword = (pin.keywords || '매물').split(',')[0].substring(0, 10);
 
     const infoBoxHTML = `
-      <div style="background:white; border:2px solid ${color}; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.25); min-width:140px; display:flex; flex-direction:column; pointer-events:none;">
-        <div style="background:${color}; color:white; padding:4px 8px; font-size:11px; font-weight:bold; border-radius:2px 2px 0 0; text-align:center;">${keyword}</div>
-        <div style="padding:8px 10px; font-size:11px; font-weight:800; color:#111; text-align:center;">${typeStr} | ${priceDetail}</div>
+      <div style="
+        background: white; 
+        border: 2px solid ${color}; 
+        border-radius: 6px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
+        min-width: 140px; 
+        overflow: hidden;
+        animation: fadeIn 0.1s ease-out;
+      ">
+        <div style="
+          background: ${color}; 
+          color: white; 
+          padding: 6px 10px; 
+          font-size: 12px; 
+          font-weight: bold; 
+          text-align: center;
+        ">
+          ${keyword}
+        </div>
+        <div style="
+          padding: 8px 10px; 
+          font-size: 13px; 
+          font-weight: 800; 
+          color: #1f2937; 
+          text-align: center;
+          white-space: nowrap;
+        ">
+          ${priceDisplay}
+        </div>
       </div>
     `;
-    const box = hoverOverlayRef.current.getContent();
-    box.innerHTML = infoBoxHTML;
-    box.style.display = 'block';
+
     hoverOverlayRef.current.setPosition(position);
+    hoverOverlayRef.current.getContent().innerHTML = infoBoxHTML;
+    hoverOverlayRef.current.setMap(mapInstanceRef.current);
   };
 
-  const hideInfoBox = () => { if (hoverOverlayRef.current) hoverOverlayRef.current.getContent().style.display = 'none'; };
+  const hideInfoBox = () => { 
+    if (hoverOverlayRef.current) hoverOverlayRef.current.setMap(null);
+  };
 
   return { overlayDOMsRef: markersMapRef };
 }
