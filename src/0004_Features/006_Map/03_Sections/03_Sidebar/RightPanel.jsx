@@ -32,43 +32,88 @@ const RightPanel = () => {
     paddingBottom: '100px', boxSizing: 'border-box'
   };
 
-  // ★ [수정됨] 가격 표시 순서 변경: 가격 | 보증금 | 권리금
+  // ★ [수정됨] 상세화면 가격 표시 (월세 포맷 변경: 보증금/월세)
   const renderPriceInfo = (pin) => {
     if (!pin) return '-';
     const fmt = n => Number(n || 0).toLocaleString();
 
-    let mainPrice = '';
-    let depositValue = 0; // 보증금 값
+    const priceRows = [];
 
-    // 1. 거래 유형별 메인 가격 및 보증금 데이터 추출
+    // 1. 매매
     if (pin.is_sale) {
-      mainPrice = `매매 ${fmt(pin.sale_price)}`;
-      // 매매일 때 폼의 '보증금' 필드는 rent_amount에 저장됨 (기보증금)
-      depositValue = pin.rent_amount; 
-    } else if (pin.is_jeonse) {
-      mainPrice = `전세 ${fmt(pin.jeonse_deposit)}`;
-      // 전세일 때 폼의 '보증금' 필드는 rent_amount에 저장됨 (기보증금)
-      depositValue = pin.rent_amount;
-    } else if (pin.is_rent) {
-      mainPrice = `월세 ${fmt(pin.rent_amount)}`;
-      // 월세일 때 보증금은 rent_deposit에 저장됨
-      depositValue = pin.rent_deposit;
+      priceRows.push({ 
+        label: '매매', 
+        text: `${fmt(pin.sale_price)}`, 
+        color: '#ef4444', 
+        bg: '#fee2e2' 
+      });
     }
 
-    // 2. 권리금
-    const keyMoney = pin.key_money ? `권리금 ${fmt(pin.key_money)}` : null;
+    // 2. 전세
+    if (pin.is_jeonse) {
+      priceRows.push({ 
+        label: '전세', 
+        text: `${fmt(pin.jeonse_deposit)}`, 
+        color: '#3b82f6', 
+        bg: '#dbeafe' 
+      });
+    }
 
-    // 3. 보증금 (값이 있을 때만 표시)
-    const deposit = depositValue ? `보증금 ${fmt(depositValue)}` : null;
+    // 3. 월세 (보증금 / 월세)
+    if (pin.is_rent) {
+      const deposit = pin.rent_deposit ? fmt(pin.rent_deposit) : '0';
+      const rent = fmt(pin.rent_amount);
+      const text = `${deposit} / ${rent}`;
+      
+      priceRows.push({ 
+        label: '월세', 
+        text, 
+        color: '#10b981', 
+        bg: '#d1fae5' 
+      });
+    }
 
-    // ★ 표시 순서 변경: [메인가격] -> [보증금] -> [권리금]
+    if (priceRows.length === 0) return <span>-</span>;
+
     return (
-      <span style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-        <span>{mainPrice}</span>
-        {deposit && <span style={{ color: '#9ca3af' }}>| {deposit}</span>}
-        {keyMoney && <span style={{ color: '#9ca3af' }}>| {keyMoney}</span>}
-      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {priceRows.map((p, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ 
+              backgroundColor: p.bg, color: p.color, padding: '4px 8px', 
+              borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold', minWidth: '40px', textAlign: 'center'
+            }}>
+              {p.label}
+            </span>
+            <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#374151' }}>
+              {p.text}
+            </span>
+          </div>
+        ))}
+
+        {pin.key_money > 0 && (
+           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', borderTop: '1px dashed #e5e7eb', paddingTop: '10px' }}>
+             <span style={{ 
+                backgroundColor: '#f3f4f6', color: '#6b7280', padding: '4px 8px', 
+                borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold', minWidth: '40px', textAlign: 'center'
+             }}>
+               권리금
+             </span>
+             <span style={{ fontSize: '1rem', color: '#4b5563' }}>
+               {fmt(pin.key_money)}
+             </span>
+           </div>
+        )}
+      </div>
     );
+  };
+
+  const getTradeTypeString = (pin) => {
+    const types = [];
+    if (pin.is_sale) types.push('매매');
+    if (pin.is_jeonse) types.push('전세');
+    if (pin.is_rent) types.push('월세');
+    return types.join(', ') || '-';
   };
 
   const renderDetailRow = (label, value, isLongText = false) => (
@@ -93,25 +138,22 @@ const RightPanel = () => {
       ) : (
         selectedPin && selectedPin.id && (
             <div style={{padding:'24px'}}>
-               {/* 1. 기본 정보 헤더 */}
                <div style={{marginBottom:'20px'}}>
-                 <span style={{backgroundColor:'#eff6ff', color:'#2563eb', padding:'4px 8px', borderRadius:'4px', fontSize:'0.8rem', fontWeight:'bold'}}>
-                   {selectedPin.property_type || '매물'}
-                 </span>
-                 <h2 style={{ fontSize: '1.5rem', fontWeight: '800', margin: '10px 0 5px', color:'#111827', lineHeight:'1.3' }}>
+                 <div style={{display:'flex', gap:'5px', marginBottom:'5px'}}>
+                   <span style={{backgroundColor:'#eff6ff', color:'#2563eb', padding:'4px 8px', borderRadius:'4px', fontSize:'0.8rem', fontWeight:'bold'}}>
+                     {selectedPin.property_type || '매물'}
+                   </span>
+                 </div>
+                 <h2 style={{ fontSize: '1.5rem', fontWeight: '800', margin: '5px 0', color:'#111827', lineHeight:'1.3' }}>
                    {selectedPin.building_name || selectedPin.keywords || '매물 상세 정보'}
                  </h2>
                  <p style={{color:'#6b7280', fontSize:'0.9rem'}}>{selectedPin.address} {selectedPin.detailed_address}</p>
                </div>
 
-               {/* 2. 가격 정보 박스 (순서 변경됨) */}
                <div style={{padding:'20px', backgroundColor:'#f0fdf4', borderRadius:'12px', marginBottom:'24px', border:'1px solid #dcfce7'}}>
-                  <h3 style={{fontSize:'1.1rem', fontWeight:'bold', color:'#047857', margin:0}}>
-                    {renderPriceInfo(selectedPin)}
-                  </h3>
+                  {renderPriceInfo(selectedPin)}
                </div>
 
-               {/* 3. 사진 섹션 */}
                {selectedPin.image_urls && selectedPin.image_urls.length > 0 && (
                  <div style={{ marginBottom: '30px' }}>
                    <h3 style={{fontSize:'1rem', fontWeight:'bold', marginBottom:'10px', color:'#374151'}}>매물 사진</h3>
@@ -122,7 +164,7 @@ const RightPanel = () => {
                            src={url} 
                            alt={`매물사진-${idx}`} 
                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
-                           onClick={() => window.open(url, '_blank')} // 클릭 시 원본 보기
+                           onClick={() => window.open(url, '_blank')} 
                          />
                        </div>
                      ))}
@@ -130,18 +172,15 @@ const RightPanel = () => {
                  </div>
                )}
 
-               {/* 4. 매물 정보 */}
                <h3 style={{fontSize:'1rem', fontWeight:'bold', borderBottom:'2px solid #f3f4f6', paddingBottom:'8px', marginBottom:'16px'}}>매물 정보</h3>
-               {renderDetailRow("거래 유형", selectedPin.is_sale ? '매매' : (selectedPin.is_jeonse ? '전세' : '월세'))}
+               {renderDetailRow("거래 유형", getTradeTypeString(selectedPin))}
                {renderDetailRow("면적", selectedPin.area ? `${selectedPin.area}평` : '')}
                {renderDetailRow("층수", selectedPin.floor ? `${selectedPin.floor}층` : '')}
                {renderDetailRow("관리비", selectedPin.maintenance_fee ? `${Number(selectedPin.maintenance_fee).toLocaleString()}만원` : '')}
                {renderDetailRow("메모", selectedPin.notes, true)}
                {renderDetailRow("메인 키워드", selectedPin.keywords)}
 
-               {/* 5. 버튼 그룹 */}
                <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-                 
                  <button 
                    onClick={() => alert("AI 입지분석 리포트 기능 준비 중입니다.")}
                    style={{
@@ -176,7 +215,6 @@ const RightPanel = () => {
                      닫기
                    </button>
                  </div>
-
                </div>
             </div>
         )

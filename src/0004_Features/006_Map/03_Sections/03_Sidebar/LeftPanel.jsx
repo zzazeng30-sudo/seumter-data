@@ -19,7 +19,6 @@ const LeftPanel = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 선택된 매물에 따른 그룹 자동 펼침
   useEffect(() => {
     const newExpandedKeys = { ...expandedKeys };
     if (selectedPin && selectedPin.id && displayNodes) {
@@ -43,52 +42,48 @@ const LeftPanel = () => {
 
   const truncate = (str, n) => (str && str.length > n) ? str.substr(0, n - 1) + '...' : str;
 
-  // ★ [수정] 가격 포맷팅 로직 통합 (리스트/상세 공통 사용 권장)
-  // 순서: [매매/전세/보증금] | [보증금/월세] | [권리금]
-  const formatPriceLogic = (pin) => {
+  // ★ [수정됨] 포맷 변경: 매 217 | 월 1000/30 | 권 33,333
+  const formatSimplePrice = (pin) => {
     if (!pin) return '-';
     const fmt = n => Number(n || 0).toLocaleString();
     const parts = [];
 
-    // 1. 거래 유형별 가격 처리
+    // 1. 매매
     if (pin.is_sale) {
-      if (pin.sale_price) parts.push(`매 ${fmt(pin.sale_price)}`);
-      // 매매 시 rent_amount는 '기보증금' -> '보'로 표시
-      if (pin.rent_amount) parts.push(`보 ${fmt(pin.rent_amount)}`);
+      parts.push(`매 ${fmt(pin.sale_price)}`);
     } 
-    else if (pin.is_jeonse) {
-      if (pin.jeonse_deposit) parts.push(`전 ${fmt(pin.jeonse_deposit)}`);
-      // 전세 시 rent_amount는 '보증금' -> '보'로 표시
-      if (pin.rent_amount) parts.push(`보 ${fmt(pin.rent_amount)}`);
+    
+    // 2. 전세
+    if (pin.is_jeonse) {
+      parts.push(`전 ${fmt(pin.jeonse_deposit)}`);
     } 
-    else if (pin.is_rent) {
-      // 월세는 '보증금' 먼저, 그 다음 '월세'
-      if (pin.rent_deposit) parts.push(`보 ${fmt(pin.rent_deposit)}`);
-      if (pin.rent_amount) parts.push(`월 ${fmt(pin.rent_amount)}`);
+    
+    // 3. 월세: 보증금/월세 (보증금 없으면 0 표시)
+    if (pin.is_rent) {
+      const deposit = pin.rent_deposit ? fmt(pin.rent_deposit) : '0';
+      const rent = fmt(pin.rent_amount);
+      parts.push(`월 ${deposit}/${rent}`);
     }
 
-    // 2. 권리금 (항상 마지막)
-    if (pin.key_money) parts.push(`권 ${fmt(pin.key_money)}`);
+    // 4. 권리금
+    // 배열을 ' | '로 합칩니다.
+    let priceStr = parts.join(' | ');
+    
+    if (pin.key_money > 0) {
+      if (priceStr) priceStr += ' | ';
+      priceStr += `권 ${fmt(pin.key_money)}`;
+    }
 
-    return parts.length > 0 ? parts.join(' | ') : '-'; // 구분자 ' | ' 사용
+    return priceStr || '-';
   };
 
-  // 상세 보기용 긴 가격 문자열 (위 로직 재사용)
-  const getPriceString = (pin) => formatPriceLogic(pin);
+  const getPriceString = (pin) => formatSimplePrice(pin);
 
-  // 리스트용 가격 포맷팅 (위 로직 재사용)
-  const formatSimplePrice = (pin) => formatPriceLogic(pin);
-
-  // 단일 아이템 렌더링
   const renderItem = (pin, isChild = false) => {
     const isActive = selectedPin && String(selectedPin.id) === String(pin.id);
-    
-    // 호버 상태 체크 (단일 ID 또는 배열 내 포함 여부)
     const isHovered = Array.isArray(hoveredPinId) 
       ? hoveredPinId.map(String).includes(String(pin.id)) 
       : String(hoveredPinId) === String(pin.id);
-    
-    // 표시 이름 결정 로직 (스택 제목 > 건물명 > 키워드 > 기본값)
     const displayTitle = pin.title || pin.building_name || pin.keywords || '매물';
 
     return (
@@ -98,7 +93,6 @@ const LeftPanel = () => {
           e.stopPropagation(); 
           handleItemClick(pin); 
         }} 
-        // [단일 매물] 호버 이벤트
         onMouseEnter={() => !isMobile && setHoveredPinId(pin.id)} 
         onMouseLeave={() => !isMobile && setHoveredPinId(null)}   
         className={`
@@ -108,30 +102,26 @@ const LeftPanel = () => {
           ${isHovered ? styles.hovered : ''}
         `}
       >
-         <div className={styles.itemHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                <span className={styles.keywords} style={{ fontWeight: pin.title ? 'bold' : 'normal' }}>
-                    {truncate(displayTitle, 10)}
-                </span>
-                <span className={styles.divider}>|</span>
-                <span className={styles.typeLabel} style={{ minWidth: '30px' }}>
-                    {pin.is_sale ? '매매' : pin.is_jeonse ? '전세' : '월세'}
-                </span>
+         <div className={styles.itemHeader} style={{ display: 'flex', flexDirection:'column', width: '100%', gap:'4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width:'100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    <span className={styles.keywords} style={{ fontWeight: pin.title ? 'bold' : 'normal', fontSize:'0.95rem' }}>
+                        {truncate(displayTitle, 20)}
+                    </span>
+                </div>
             </div>
-            {/* ★ [수정] 가격 표시 부분: 파란색 강조, 오른쪽 정렬 */}
-            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb', whiteSpace: 'nowrap', marginLeft: 'auto', paddingLeft: '8px' }}>
+            {/* 가격 표시 */}
+            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#2563eb', textAlign: 'right', marginTop:'2px' }}>
                 {formatSimplePrice(pin)}
             </div>
          </div>
-         <div className={styles.addressLabel} style={{ marginTop: '4px' }}>{truncate(pin.address, 15)}</div>
+         <div className={styles.addressLabel} style={{ marginTop: '4px', color:'#6b7280' }}>{truncate(pin.address, 40)}</div>
       </li>
     );
   };
 
-  // 모바일 상세 뷰
   const renderMobileDetail = () => {
     if (!selectedPin) return null;
-    
     const mobileTitle = selectedPin.title || selectedPin.building_name || selectedPin.keywords || '매물 상세';
 
     return (
@@ -144,17 +134,39 @@ const LeftPanel = () => {
           ← 목록으로 돌아가기
         </button>
         <div className={styles.detailHeader}>
-          <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
-            {selectedPin.property_type || '매물'}
-          </span>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '10px 0 5px' }}>
-             {mobileTitle}
-          </h2>
+          <div style={{display:'flex', gap:'5px', marginBottom:'5px'}}>
+            <span style={{ backgroundColor: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
+              {selectedPin.property_type || '매물'}
+            </span>
+          </div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '10px 0 5px' }}>{mobileTitle}</h2>
           <p style={{ fontSize: '1rem', color: '#666', margin: 0 }}>{selectedPin.address}</p>
         </div>
+        
         <div style={{ padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '10px', marginBottom: '20px', marginTop: '15px' }}>
-          <strong style={{ fontSize: '1.1rem', color: '#047857' }}>{getPriceString(selectedPin)}</strong>
+           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {selectedPin.is_sale && (
+                 <div style={{color:'#ef4444', fontWeight:'bold'}}>
+                   매매 {Number(selectedPin.sale_price).toLocaleString()}
+                 </div>
+              )}
+              {selectedPin.is_jeonse && (
+                 <div style={{color:'#3b82f6', fontWeight:'bold'}}>
+                   전세 {Number(selectedPin.jeonse_deposit).toLocaleString()}
+                 </div>
+              )}
+              {selectedPin.is_rent && (
+                 <div style={{color:'#10b981', fontWeight:'bold'}}>
+                   {/* 모바일 상세도 통일: 보증금/월세 (보증금 없으면 0) */}
+                   월세 {selectedPin.rent_deposit ? Number(selectedPin.rent_deposit).toLocaleString() : '0'} / {Number(selectedPin.rent_amount).toLocaleString()}
+                 </div>
+              )}
+              {selectedPin.key_money > 0 && (
+                 <div style={{color:'#6b7280', fontSize:'0.9rem'}}>권리금 {Number(selectedPin.key_money).toLocaleString()}</div>
+              )}
+           </div>
         </div>
+        
         <div className={styles.memoTitle} style={{ fontWeight: 'bold', marginBottom: '10px' }}>상세 설명</div>
         <div style={{ padding: '15px', backgroundColor: '#f9fafb', borderRadius: '8px', minHeight: '100px', whiteSpace: 'pre-wrap' }}>
           {selectedPin.notes || "등록된 메모가 없습니다."}
@@ -183,31 +195,12 @@ const LeftPanel = () => {
               <li className={styles.emptyMsg}>매물이 없습니다.</li>
             ) : (
               displayNodes.map((node) => {
-                // 1. 단일 매물 렌더링
                 if (node.type === 'SINGLE') return renderItem(node.data, false);
-                
-                // 2. 그룹(스택/클러스터) 렌더링
                 const groupIds = node.items.map(i => String(i.id)); 
-                
-                const isGroupActive = selectedPin && groupIds.includes(String(selectedPin.id));
-                const isGroupHovered = Array.isArray(hoveredPinId) &&
-                   hoveredPinId.length === groupIds.length &&
-                   groupIds.every(id => hoveredPinId.map(String).includes(id));
-
                 const isExpanded = expandedKeys[node.id];
-
                 return (
                   <li key={node.id} className={styles.groupItem}>
-                    <div 
-                      onClick={() => toggleGroup(node.id)}
-                      onMouseEnter={() => !isMobile && setHoveredPinId(groupIds)}
-                      onMouseLeave={() => !isMobile && setHoveredPinId(null)}
-                      className={`
-                        ${styles.groupHeader} 
-                        ${isGroupActive ? styles.active : ''}
-                        ${isGroupHovered ? styles.hovered : ''} 
-                      `} 
-                    >
+                    <div onClick={() => toggleGroup(node.id)} className={`${styles.groupHeader}`}>
                       <div className={styles.groupInfo}>
                         <div className={`${styles.countBadge} ${node.type === 'STACK' ? styles.stack : styles.cluster}`}>
                           {node.items.length}

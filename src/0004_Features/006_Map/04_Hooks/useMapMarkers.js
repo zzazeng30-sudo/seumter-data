@@ -177,14 +177,14 @@ export default function useMapMarkers({
     });
   }, [displayNodes, isMapReady, selectedPin, hoveredPinId, activeOverlayKey]);
 
-  // ★ [수정됨] 거래 유형별 가격 표시 로직 (월세/보증금 구분)
+  // ★ [수정됨] 지도 마커 정보창 포맷 통일
   const showInfoBox = (pin, position, color) => {
     if (!hoverOverlayRef.current || !mapInstanceRef.current) return;
     
-    // 포맷터
+    // 포맷터 (억 단위 변환)
     const fmt = (n) => {
       const num = Number(n || 0);
-      if (num === 0) return '';
+      if (num === 0) return '0';
       return num >= 10000 
         ? (num % 10000 === 0 ? `${num/10000}억` : `${(num/10000).toFixed(1)}억`) 
         : num.toLocaleString();
@@ -192,30 +192,33 @@ export default function useMapMarkers({
 
     const parts = [];
 
-    // 거래 유형별 표시 분기
+    // 1. 매매
     if (pin.is_sale) {
-      // 매매: 매매가 + (보증금) + (권리금)
-      if (pin.sale_price) parts.push(`매${fmt(pin.sale_price)}`);
-      // 매매/전세일 때 폼의 '보증금'은 DB의 rent_amount 필드에 저장됨
-      if (pin.rent_amount) parts.push(`보${fmt(pin.rent_amount)}`);
+      parts.push(`매${fmt(pin.sale_price)}`);
     } 
-    else if (pin.is_jeonse) {
-      // 전세: 전세금 + (보증금) + (권리금)
-      if (pin.jeonse_deposit) parts.push(`전${fmt(pin.jeonse_deposit)}`);
-      if (pin.rent_amount) parts.push(`보${fmt(pin.rent_amount)}`);
+    
+    // 2. 전세
+    if (pin.is_jeonse) {
+      parts.push(`전${fmt(pin.jeonse_deposit)}`);
     } 
-    else if (pin.is_rent) {
-      // 월세: 보증금 + 월세 + (권리금)
-      // 월세일 때 보증금은 rent_deposit 필드, 월세는 rent_amount 필드
-      if (pin.rent_deposit) parts.push(`보${fmt(pin.rent_deposit)}`);
-      if (pin.rent_amount) parts.push(`월${fmt(pin.rent_amount)}`);
+    
+    // 3. 월세 (월세액 / (보 보증금))
+    if (pin.is_rent) {
+      const deposit = pin.rent_deposit ? fmt(pin.rent_deposit) : '0';
+      const rent = fmt(pin.rent_amount);
+      // 지도 InfoBox는 공간이 좁으므로 '(보)'를 생략하거나 간략히 표시
+      // 여기서는 요청하신 '월 30/(보1000)' 스타일을 따름
+      parts.push(`월${rent}/(보${deposit})`);
     }
     
-    // 권리금은 공통적으로 있으면 표시
-    if (pin.key_money) parts.push(`권${fmt(pin.key_money)}`);
+    // 4. 권리금
+    let priceDisplay = parts.join(' | ');
+    if (pin.key_money > 0) {
+      if (priceDisplay) priceDisplay += ' | ';
+      priceDisplay += `권${fmt(pin.key_money)}`;
+    }
 
-    // 콤마(,)와 띄어쓰기로 연결
-    const priceDisplay = parts.length > 0 ? parts.join(', ') : '가격미정';
+    if (!priceDisplay) priceDisplay = '가격미정';
     
     const keyword = (pin.keywords || '매물').split(',')[0].substring(0, 10);
 

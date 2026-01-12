@@ -478,3 +478,40 @@
 .formGroupFull {
   flex: 1 1 100%; /* 100% 너비 */
 }
+
+/* 선택 삭제 전용 스타일 추가 */
+.batchDeleteContainer {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.batchDeleteBtn {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.batchDeleteBtn:hover {
+    background-color: #dc2626;
+}
+
+/* 체크박스 열 정렬 */
+.table th:first-child,
+.table td:first-child {
+    width: 40px;
+    text-align: center;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+/* 선택된 행 배경색 (선택사항) */
+.selectedRow {
+    background-color: #fffaf0 !important;
+}
