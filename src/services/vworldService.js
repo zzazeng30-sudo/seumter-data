@@ -1,3 +1,9 @@
+// src/services/vworldService.js
+
+// ★ 중요: 여기에 아까 복사한 Render 서버 주소를 넣으세요 (뒤에 /api/vworld 까지 포함)
+// 예시: 'https://seumter-server-xxxx.onrender.com/api/vworld'
+const API_BASE_URL = 'https://seumter-backend.onrender.com/api/vworld'; 
+
 const VWORLD_KEY = 'B7941404-230D-3C80-AD35-0D7766882694';
 
 export const fetchPnuListInPolygon = async (polygonCoords) => {
@@ -20,7 +26,15 @@ export const fetchPnuListInPolygon = async (polygonCoords) => {
   });
 
   try {
-    const response = await fetch(`/api/vworld/req/wfs?${params.toString()}`);
+    // [수정됨] 절대 경로(Render 서버 주소) 사용
+    // 기존: fetch(`/api/vworld/req/wfs?${params.toString()}`)
+    // 변경: fetch(`${API_BASE_URL}/req/wfs?${params.toString()}`)
+    const response = await fetch(`${API_BASE_URL}/req/wfs?${params.toString()}`);
+    
+    if (!response.ok) {
+        throw new Error(`서버 응답 오류: ${response.status}`);
+    }
+
     const data = await response.json();
     
     if (!data.features) return [];

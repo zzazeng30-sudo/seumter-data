@@ -1,9 +1,10 @@
 // server.cjs
-// [최종 수정]
-// 1. 주소 잘림 해결 (이어붙이기 로직 강화)
-// 2. 마스킹된 주민번호 허용
-// 3. 대지/산/특수블록 전수 조사 (누락 방지)
-// 4. 장바구니 페이로드 강화 (동기화 에러 방지)
+// [최종 통합 버전]
+// 1. VWorld / 공공데이터 프록시 추가 (영역 그리기 404 해결)
+// 2. 세움터 주소 잘림 해결 (이어붙이기 로직)
+// 3. 마스킹된 주민번호 허용
+// 4. 대지/산/특수블록 전수 조사 (누락 방지)
+// 5. 장바구니 페이로드 강화 (동기화 에러 방지)
 
 const express = require('express');
 const cors = require('cors');
@@ -18,7 +19,7 @@ const PORT = 3001;
 app.use(cors());
 app.use(bodyParser.json());
 
-// ★ [필수] 브라우저 위장 헤더
+// ★ [필수] 브라우저 위장 헤더 (세움터용)
 const BROWSER_HEADERS = {
     'Accept': 'application/json, text/javascript, */*; q=0.01',
     'Content-Type': 'application/json;charset=UTF-8', 
@@ -30,6 +31,49 @@ const BROWSER_HEADERS = {
 };
 
 const GITHUB_RAW_URL = "https://raw.githubusercontent.com/zzazeng30-sudo/dataqjqwjd/main/20260201dong.csv";
+
+// =================================================================
+// ★ [추가됨] 프록시 설정 (Render 배포 시 vite.config.js 대체)
+// =================================================================
+
+// 1. VWorld API 프록시
+app.get('/api/vworld/*', async (req, res) => {
+    try {
+        // 요청 경로: /api/vworld/req/data -> https://api.vworld.kr/req/data
+        const apiPath = req.path.replace('/api/vworld', ''); 
+        const targetUrl = `https://api.vworld.kr${apiPath}`;
+
+        console.log(`🌐 [VWorld Proxy] ${targetUrl}`);
+        
+        const response = await axios.get(targetUrl, {
+            params: req.query // 쿼리 파라미터 전달
+        });
+        res.json(response.data);
+    } catch (error) {
+        console.error('❌ VWorld Proxy Error:', error.message);
+        res.status(500).json({ error: 'VWorld 요청 실패', details: error.message });
+    }
+});
+
+// 2. 공공데이터포털 API 프록시
+app.get('/api/data-go/*', async (req, res) => {
+    try {
+        const apiPath = req.path.replace('/api/data-go', '');
+        const targetUrl = `https://apis.data.go.kr${apiPath}`;
+
+        console.log(`🌐 [DataGo Proxy] ${targetUrl}`);
+
+        const response = await axios.get(targetUrl, {
+            params: req.query
+        });
+        res.json(response.data);
+    } catch (error) {
+        console.error('❌ DataGo Proxy Error:', error.message);
+        res.status(500).json({ error: 'DataGo 요청 실패', details: error.message });
+    }
+});
+
+// =================================================================
 
 function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
 
@@ -130,8 +174,7 @@ function classifyDataFinal(dataList, targetAddress) {
         else if (patterns.reasonKeywords.some(k => text.includes(k))) type = 'reason';
         // 5. 주소 (키워드가 있거나 길이가 5자 이상)
         else if (text.length > 5 && patterns.addressKeywords.some(k => text.includes(k))) type = 'address';
-        // ★ [핵심] 주소 뒷부분 파편 처리 (괄호로 끝나거나 시작하는 경우)
-        // 예: "축동)" -> 이것도 주소의 일부로 봐야 함
+        // ★ [핵심] 주소 뒷부분 파편 처리
         else if (text.endsWith(')') || text.startsWith('(')) type = 'address_part';
         // 6. 이름
         else {
@@ -142,20 +185,15 @@ function classifyDataFinal(dataList, targetAddress) {
         }
 
         if (type !== "UNKNOWN") {
-            // ★ [수정] 주소 이어붙이기 로직 강화
+            // ★ [수정] 주소 이어붙이기 로직
             if (type === 'address' || type === 'address_part') {
                 if (current['address']) {
-                    // 이미 주소가 있는데 또 주소(혹은 파편)가 들어오면 이어붙임
-                    // 단, 너무 뜬금없는 텍스트가 붙지 않도록 체크 (여기선 단순 concat)
                     current['address'] += " " + text;
                 } else if (type === 'address') {
-                    // 주소 시작
                     current['address'] = text;
                 }
-                // address_part만 덜렁 들어오면 무시하거나 이전 사람 주소일 수 있으나 여기선 생략
             } 
             else if (current[type]) {
-                // 이름, 주민번호 등이 겹치면 다음 사람
                 saveAndReset();
                 current[type] = text;
             } else {
