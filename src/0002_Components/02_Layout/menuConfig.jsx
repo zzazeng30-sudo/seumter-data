@@ -1,9 +1,9 @@
 /**
  * [Revision Info]
- * Rev: 1.16 (JSX Syntax Fix)
- * Date: 2026-01-10
+ * Rev: 1.17 (Added Analysis Tab for VWorld)
+ * Date: 2026-01-12
  */
-import React from 'react'; // 이 줄이 반드시 있어야 합니다.
+import React from 'react';
 
 // 페이지 컴포넌트 임포트
 import MapPage from '../../0004_Features/006_Map/01_Pages/MapPage';
@@ -14,6 +14,9 @@ import MyPage from '../../0004_Features/007_MyPage/MyPage';
 import ConsultationLogPage from '../../0004_Features/002_Consultation/ConsultationLogPage';
 import PropertyPage from '../../0004_Features/008_Property/PropertyPage';
 
+// [신규 추가] 지적분석 페이지
+import LandAnalysisPage from '../../0004_Features/009_Analysis/LandAnalysisPage';
+
 export const mainMenus = ['대시보드', '매물', '고객', '계약', '마이페이지'];
 
 export const menuData = {
@@ -23,7 +26,9 @@ export const menuData = {
   ],
   '매물': [
     { id: 'prop-map', name: '매물지도', component: <MapPage />, isMap: true, mode: 'manage' },
-    { id: 'prop-list', name: '매물리스트', component: <PropertyPage />, isMap: true }
+    { id: 'prop-list', name: '매물리스트', component: <PropertyPage />, isMap: true },
+    // [추가] 브이월드 기반 지적분석 메뉴
+    { id: 'prop-analysis', name: '지적분석', component: <LandAnalysisPage />, isMap: true }
   ],
   '고객': [
     { id: 'cust-manage', name: '고객관리', component: <CustomerPage />, isMap: true },

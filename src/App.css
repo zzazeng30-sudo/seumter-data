@@ -1,16 +1,16 @@
-#root {
-width: 100%;
-  max-width: none;  /* 1280px 제한 해제 */
-  margin: 0;        /* 가운데 정렬 해제 */
-  padding: 0;       /* 2rem 여백 제거 */
-  text-align: left; /* 가운데 정렬 해제 */
-  
-  /* 화면 전체 사용 */
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* src/App.css */
+/* index.css 및 App.css 공통 적용 */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;    /* vh 대신 100%를 사용하여 부모로부터 높이를 상속받음 */
+  width: 100%;
+  overflow: hidden; /* 페이지 전체 스크롤 방지 */
 }
 
+* {
+  box-sizing: border-box; /* 패딩이 높이에 영향을 주지 않도록 함 */
+}
 .logo {
   height: 6em;
   padding: 1.5em;

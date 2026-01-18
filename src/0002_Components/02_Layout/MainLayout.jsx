@@ -13,6 +13,9 @@ import MyPage from '../../0004_Features/007_MyPage/MyPage';
 import ConsultationLogPage from '../../0004_Features/002_Consultation/ConsultationLogPage';
 import PropertyPage from '../../0004_Features/008_Property/PropertyPage';
 
+// [추가] 지적분석 페이지 임포트
+import LandAnalysisPage from '../../0004_Features/009_Analysis/LandAnalysisPage';
+
 const menuData = {
   '대시보드': [
     { id: 'dashboard-schedule', name: '스케줄표', component: <DashboardPage />, icon: '📊' },
@@ -21,6 +24,8 @@ const menuData = {
   '매물': [
     { id: 'prop-map', name: '매물 지도', component: <MapPage />, isMap: true, mode: 'manage', icon: '📍' },
     { id: 'prop-list', name: '매물 리스트', component: <PropertyPage />, isMap: true, icon: '📋' },
+    // [추가] 지적분석 메뉴 데이터 삽입
+    { id: 'prop-analysis', name: '지적분석', component: <LandAnalysisPage />, isMap: true, icon: '🔍' },
   ],
   '고객': [
     { id: 'cust-add', name: '고객 추가', icon: '➕' }, 
@@ -45,7 +50,7 @@ const mainMenus = [
 
 export default function MainLayout({ session }) {
   const [activeMainMenu, setActiveMainMenu] = useState('매물');
-  const [activeSubMenu, setActiveSubMenu] = useState(menuData['매물'][0].id);
+  const [activeSubMenu, setActiveSubMenu] = useState('prop-map');
   const [customerModalTrigger, setCustomerModalTrigger] = useState(0);
   const [isCustomerModalVisible, setIsCustomerModalVisible] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -67,7 +72,7 @@ export default function MainLayout({ session }) {
 
   return (
     <div className={styles.layout}>
-      {/* 1. 메인 메뉴 바 (데스크탑: 상단 고정 / 모바일: CSS order에 의해 하단 이동) */}
+      {/* 1. 메인 메뉴 바 */}
       <header className={`${styles.mainBar} ${styles.noScrollbar}`}>
         {mainMenus.map(m => (
           <button 
@@ -79,14 +84,13 @@ export default function MainLayout({ session }) {
               setIsCustomerModalVisible(false);
             }}
           >
-            {/* 모바일에서만 아이콘 표시 */}
             {isMobile && <span style={{ fontSize: '20px' }}>{m.icon}</span>}
             <span>{m.name}</span>
           </button>
         ))}
       </header>
 
-      {/* 2. 서브 메뉴 바 (데스크탑: 메인 메뉴 아래 / 모바일: 최상단) */}
+      {/* 2. 서브 메뉴 바 */}
       <nav className={`${styles.subBar} ${styles.noScrollbar}`}>
         {currentSubList.map(sub => {
           let isTabActive = activeSubMenu === sub.id;
@@ -108,7 +112,6 @@ export default function MainLayout({ session }) {
                 }
               }}
             >
-              {/* 모바일 탭 디자인에 아이콘 추가 (선택 사항) */}
               {isMobile && <span style={{ marginRight: '4px' }}>{sub.icon}</span>}
               {sub.name}
             </button>
@@ -116,8 +119,11 @@ export default function MainLayout({ session }) {
         })}
       </nav>
 
-      {/* 3. 메인 컨텐츠 영역 */}
-      <main className={`${styles.content} ${isMapMode ? styles.contentMapMode : ''}`}>
+      {/* 3. 메인 컨텐츠 영역 - [핵심수정] key 부여로 컴포넌트 완전 재시작 강제 */}
+      <main 
+        key={activeSubMenu} 
+        className={`${styles.content} ${isMapMode ? styles.contentMapMode : ''}`}
+      >
         {currentPage?.component && React.cloneElement(currentPage.component, { 
           session,
           modalTrigger: customerModalTrigger,
