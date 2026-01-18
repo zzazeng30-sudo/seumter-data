@@ -1,10 +1,5 @@
 // server.cjs
-// [최종 통합 버전]
-// 1. VWorld / 공공데이터 프록시 추가 (영역 그리기 404 해결)
-// 2. 세움터 주소 잘림 해결 (이어붙이기 로직)
-// 3. 마스킹된 주민번호 허용
-// 4. 대지/산/특수블록 전수 조사 (누락 방지)
-// 5. 장바구니 페이로드 강화 (동기화 에러 방지)
+// [최종 통합 버전] 모든 크롤링 로직 + VWorld/공공데이터 프록시 통합
 
 const express = require('express');
 const cors = require('cors');
@@ -14,10 +9,16 @@ const { wrapper } = require('axios-cookiejar-support');
 const { CookieJar } = require('tough-cookie');
 
 const app = express();
-const PORT = 3001;
+// Render 환경에서는 process.env.PORT를 사용해야 합니다.
+const PORT = process.env.PORT || 3001; 
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// ★ [추가] 서버 상태 확인용 메인 경로 (Cannot GET / 해결)
+app.get('/', (req, res) => {
+    res.send('✅ 세움터 및 VWorld 프록시 서버가 정상 작동 중입니다!');
+});
 
 // ★ [필수] 브라우저 위장 헤더 (세움터용)
 const BROWSER_HEADERS = {
@@ -33,21 +34,16 @@ const BROWSER_HEADERS = {
 const GITHUB_RAW_URL = "https://raw.githubusercontent.com/zzazeng30-sudo/dataqjqwjd/main/20260201dong.csv";
 
 // =================================================================
-// ★ [추가됨] 프록시 설정 (Render 배포 시 vite.config.js 대체)
+// ★ 프록시 설정 (영역 그리기 404 해결)
 // =================================================================
 
 // 1. VWorld API 프록시
 app.get('/api/vworld/*', async (req, res) => {
     try {
-        // 요청 경로: /api/vworld/req/data -> https://api.vworld.kr/req/data
         const apiPath = req.path.replace('/api/vworld', ''); 
         const targetUrl = `https://api.vworld.kr${apiPath}`;
-
         console.log(`🌐 [VWorld Proxy] ${targetUrl}`);
-        
-        const response = await axios.get(targetUrl, {
-            params: req.query // 쿼리 파라미터 전달
-        });
+        const response = await axios.get(targetUrl, { params: req.query });
         res.json(response.data);
     } catch (error) {
         console.error('❌ VWorld Proxy Error:', error.message);
@@ -60,12 +56,8 @@ app.get('/api/data-go/*', async (req, res) => {
     try {
         const apiPath = req.path.replace('/api/data-go', '');
         const targetUrl = `https://apis.data.go.kr${apiPath}`;
-
         console.log(`🌐 [DataGo Proxy] ${targetUrl}`);
-
-        const response = await axios.get(targetUrl, {
-            params: req.query
-        });
+        const response = await axios.get(targetUrl, { params: req.query });
         res.json(response.data);
     } catch (error) {
         console.error('❌ DataGo Proxy Error:', error.message);
@@ -73,6 +65,8 @@ app.get('/api/data-go/*', async (req, res) => {
     }
 });
 
+// =================================================================
+// 보조 함수 및 추출 로직 (기존 로직 100% 유지)
 // =================================================================
 
 function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
@@ -122,17 +116,14 @@ function extractDataPattern(obj, results = []) {
     return results;
 }
 
-// =================================================================
-// ★ [수정됨] 분류 로직 (주소 이어붙이기 + 마스킹 허용)
-// =================================================================
 function classifyDataFinal(dataList, targetAddress) {
-    console.log("\n⚡ [분류 로직] 데이터 정제 및 조립 시작 (주소 잘림 수정판)...");
+    console.log("\n⚡ [분류 로직] 데이터 정제 및 조립 시작...");
     const owners = [];
     let current = {};
 
     const patterns = {
         date: /^\d{4}[.\-\s]+\d{1,2}[.\-\s]+\d{1,2}[.\-\s]*$/,
-        resNo: /\d{6}\s*[-~]\s*[1-4*][\d*]{6}/, // 마스킹 허용
+        resNo: /\d{6}\s*[-~]\s*[1-4*][\d*]{6}/, 
         share: /([\d.]+\s*\/\s*[\d.]+)|\d+\s*분의\s*\d+|지분/,
         addressKeywords: ['시', '도', '구', '동', '면', '읍', '리', '로', '길', '아파트', '빌라', '층', '호'],
         reasonKeywords: ['소유권', '이전', '보존', '매매', '증여', '상속', '신탁', '교환', '변경', '등록', '환지', '압류', '가압류', '경매', '명의인', '주소변경'],
@@ -164,19 +155,12 @@ function classifyDataFinal(dataList, targetAddress) {
 
         let type = "UNKNOWN";
 
-        // 1. 주민번호
         if (patterns.resNo.test(text)) type = 'id';
-        // 2. 날짜
         else if (patterns.date.test(text)) { text = text.replace(/[.\-\s]+$/, ''); type = 'date'; }
-        // 3. 지분
         else if (text.includes('/') || patterns.share.test(text)) type = 'share';
-        // 4. 변동원인
         else if (patterns.reasonKeywords.some(k => text.includes(k))) type = 'reason';
-        // 5. 주소 (키워드가 있거나 길이가 5자 이상)
         else if (text.length > 5 && patterns.addressKeywords.some(k => text.includes(k))) type = 'address';
-        // ★ [핵심] 주소 뒷부분 파편 처리
         else if (text.endsWith(')') || text.startsWith('(')) type = 'address_part';
-        // 6. 이름
         else {
             const isHangul = patterns.nameStrict.test(text.replace(/\s/g, ''));
             const hasNumber = /[0-9]/.test(text); 
@@ -185,7 +169,6 @@ function classifyDataFinal(dataList, targetAddress) {
         }
 
         if (type !== "UNKNOWN") {
-            // ★ [수정] 주소 이어붙이기 로직
             if (type === 'address' || type === 'address_part') {
                 if (current['address']) {
                     current['address'] += " " + text;
@@ -203,20 +186,16 @@ function classifyDataFinal(dataList, targetAddress) {
     });
 
     saveAndReset();
-
-    // 중복 제거
     const uniqueOwners = owners.filter((v, i, a) => a.findIndex(t => (t.name === v.name && t.id === v.id && t.date === v.date)) === i);
-    
     return uniqueOwners.length === 0 ? [] : uniqueOwners;
 }
 
-// 장바구니 비우기
 async function clearCart(client) {
     try {
         const r05Res = await client.post('/bci/BCIAAA02R05', { inqireGbCd: "1", pageIndex: 1 });
         const list = r05Res.data?.findPbsvcResveDtls; 
         if (list && list.length > 0) {
-            console.log(`🧹 [청소] 장바구니 비우기 (${list.length}건)`);
+            console.log(`Sweep: Cleaning cart (${list.length} items)`);
             for (const item of list) {
                 try { await client.post('/bci/BCIAAA02D01', item); } catch (e) {}
             }
@@ -224,15 +203,16 @@ async function clearCart(client) {
     } catch (e) {}
 }
 
-app.post('/api/scrape', async (req, res) => {
-    console.log("\n==================================================");
-    console.log("🚀 [API 요청] 분석 시작");
-    console.log("==================================================");
+// =================================================================
+// 메인 스크래핑 엔드포인트
+// =================================================================
 
+app.post('/api/scrape', async (req, res) => {
+    console.log("\n🚀 [API REQUEST] Analysis Started");
     const { id, pw, address } = req.body;
     
     if (!id || !pw || !address) {
-        return res.status(400).json({ success: false, message: "정보 부족" });
+        return res.status(400).json({ success: false, message: "Missing info" });
     }
 
     const jar = new CookieJar();
@@ -243,22 +223,23 @@ app.post('/api/scrape', async (req, res) => {
     }));
 
     try {
-        // 1. 로그인
+        // 1. Login
         await client.get('/'); 
         const loginRes = await client.post('/awp/AWPABB01R01', { loginId: id, loginPwd: pw });
         if (loginRes.data?.userNm || loginRes.data?.reMsg === '성공') {
-            console.log(`✅ [로그인 성공] ${loginRes.data.userNm || 'User'}`);
+            console.log(`✅ [LOGIN SUCCESS] ${loginRes.data.userNm || 'User'}`);
         }
         await client.get('/cba/CBAAZA02R01'); 
         await clearCart(client);
         
-        // 2. 매핑
-        let lines;
+        // 2. Mapping
+        let csvData;
         try {
             const csvRes = await axios.get(GITHUB_RAW_URL);
-            lines = csvRes.data.split(/\r?\n/);
-        } catch (e) { throw new Error("지역코드 로드 실패"); }
+            csvData = csvRes.data;
+        } catch (e) { throw new Error("Region code load failed"); }
 
+        const lines = csvData.split(/\r?\n/);
         const addrParts = address.trim().split(/\s+/);
         const regionKeywords = addrParts.filter(part => isNaN(parseInt(part.replace(/-/g, ""))));
         
@@ -271,13 +252,13 @@ app.post('/api/scrape', async (req, res) => {
                 break;
             }
         }
-        if (!mapping) throw new Error("법정동 매핑 실패");
+        if (!mapping) throw new Error("BJD mapping failed");
 
         const bunjiMatch = address.match(/(\d+)(-(\d+))?$/);
         const mnnm = bunjiMatch ? bunjiMatch[1].padStart(4, '0') : "0000";
         const slno = (bunjiMatch && bunjiMatch[3]) ? bunjiMatch[3].padStart(4, '0') : "0000";
 
-        // 3. 조회 (전수 조사)
+        // 3. Search
         const platTypes = [{c:"0",n:"대지"}, {c:"1",n:"산"}, {c:"2",n:"블록"}];
         if (address.includes('산')) platTypes.unshift(platTypes.splice(1, 1)[0]);
 
@@ -286,7 +267,6 @@ app.post('/api/scrape', async (req, res) => {
 
         for (const type of platTypes) {
             try {
-                console.log(`🔍 [조회 시도] ${type.n}(${type.c})`);
                 const sRes = await client.post('/bci/BCIAAA02R01', {
                     addrGbCd: "0", inqireGbCd: "0", bldrgstCurdiGbCd: "0", 
                     platGbCd: type.c, reqSigunguCd: mapping.sigungu, bjdongCd: mapping.bjdong, mnnm: mnnm, slno: slno
@@ -295,18 +275,15 @@ app.post('/api/scrape', async (req, res) => {
                 if (result && result.length > 0) {
                     list = result;
                     selectedType = type.c;
-                    console.log(`   ✅ 발견: ${list.length}건`);
                     break;
                 }
             } catch (e) {}
         }
 
-        if (!list) throw new Error("건축물 정보 없음");
-
+        if (!list) throw new Error("No building info found");
         const item = list[0]; 
-        console.log(`👉 [선택] ${item.bldNm || item.locDetlAddr} (PK: ${item.bldrgstSeqno})`);
 
-        // 4. 신청 (풀 페이로드)
+        // 4. Register (Application)
         await client.post('/bci/BCIAAA02C01', { 
             bldrgstSeqno: item.bldrgstSeqno, regstrGbCd: item.regstrGbCd || "1", regstrKindCd: item.regstrKindCd || "2",
             mjrfmlyIssueYn: "N", rntyBrhsIssueYn: "N", bldrgstCurdiGbCd: "0", ownrYn: "N", multiUseBildYn: "N", 
@@ -314,12 +291,11 @@ app.post('/api/scrape', async (req, res) => {
             locDetlAddr: address, locMnnm: mnnm, locSlno: slno, locBldNm: item.bldNm || "", locDongNm: item.dongNm || ""
         });
         
-        await sleep(1000); 
+        await sleep(1500); 
 
         const r05Res = await client.post('/bci/BCIAAA02R05', { inqireGbCd: "1", pageIndex: 1 });
         const targetItem = r05Res.data?.findPbsvcResveDtls?.find(i => i.bldrgstSeqno === item.bldrgstSeqno);
-        
-        if (!targetItem) throw new Error("장바구니 동기화 실패");
+        if (!targetItem) throw new Error("Cart sync failed");
 
         await client.post('/bci/BCIAZA02S01', {
             appntInfo: { appntGbCd: "01", appntNm: "신청인" },
@@ -332,11 +308,11 @@ app.post('/api/scrape', async (req, res) => {
         await client.get('/cba/CBAAZA02R01');
         await client.post('/awp/AWPABB01R20', {});
 
-        // 5. 대기
-        console.log(`⏳ [대기] 문서 생성 중...`);
+        // 5. Wait for generation
+        console.log(`⏳ Waiting for document...`);
         const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         let successItem = null;
-        for (let i = 0; i < 30; i++) { 
+        for (let i = 0; i < 20; i++) { 
             await sleep(3000);
             try {
                 const reportRes = await client.post('/bci/BCIAAA06R01', { firstSaveEndDate: today, firstSaveStartDate: today, recordSize: 10, progStateFlagArr: ["01"] });
@@ -344,9 +320,9 @@ app.post('/api/scrape', async (req, res) => {
                 if (successItem && successItem.pbsvcRecpNo) break;
             } catch (e) {}
         }
-        if (!successItem) throw new Error("시간 초과");
+        if (!successItem) throw new Error("Wait timeout");
 
-        // 6. 데이터 추출
+        // 6. Extraction
         const recpNo = successItem.pbsvcRecpNo;
         const dRes = await client.post('/bci/BCIAAA06R03', { issueReadAppDate: today, pbsvcRecpNo: recpNo });
         const fileId = dRes.data.count?.FILE_ID;
@@ -356,7 +332,7 @@ app.post('/api/scrape', async (req, res) => {
 
         const r1 = await client.post('/report/RPTCAA02R02', `ClipID=R01&oof=${encodeURIComponent(oof)}`, { headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' } });
         const uid = parseReportResponse(r1.data)?.uid;
-        if (!uid) throw new Error("리포트 실패");
+        if (!uid) throw new Error("Report UID failed");
 
         const r2Params = `uid=${uid}&clipUID=${uid}&ClipType=DocumentPageView&ClipData=${encodeURIComponent(JSON.stringify({"reportkey":uid,"isMakeDocument":true,"pageMethod":0}))}`;
         const r2 = await client.post('/report/RPTCAA02R02', r2Params, { headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' } });
@@ -369,17 +345,16 @@ app.post('/api/scrape', async (req, res) => {
         const decodedResult = deepDecode(dataObj);
         const fullList = extractDataPattern(decodedResult);
         
-        const targetKeyword = "건축물 현황";
-        const splitIndex = fullList.findIndex(item => item.text.includes(targetKeyword));
+        const splitIndex = fullList.findIndex(item => item.text.includes("건축물 현황"));
         const finalRawData = splitIndex === -1 ? fullList : fullList.slice(0, splitIndex);
 
         const ownerList = classifyDataFinal(finalRawData, address);
         
-        console.log(`✅ [완료] 추출: ${ownerList.length}명`);
+        console.log(`✅ [COMPLETE] Extracted: ${ownerList.length} persons`);
         res.json({ success: true, data: ownerList });
 
     } catch (e) {
-        console.error(`❌ 오류: ${e.message}`);
+        console.error(`❌ ERROR: ${e.message}`);
         res.status(500).json({ success: false, message: e.message });
     } finally {
         if (client) await clearCart(client);
@@ -387,7 +362,5 @@ app.post('/api/scrape', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
-
-// [강제 업데이트용 주석] VWorld 프록시 적용 확인 2026-01-19
