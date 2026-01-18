@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // 로컬 백엔드 주소 (Vercel 배포 시에는 '/api' 등으로 변경 필요할 수 있음)
-const API_URL = 'http://localhost:3001/api/scrape';
+const API_URL = 'https://seumter-backend.onrender.com/api/scrape';
 
 export const seumterService = {
   /**
