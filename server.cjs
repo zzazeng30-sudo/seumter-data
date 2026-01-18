@@ -389,3 +389,5 @@ app.post('/api/scrape', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
+// [강제 업데이트용 주석] VWorld 프록시 적용 확인 2026-01-19
